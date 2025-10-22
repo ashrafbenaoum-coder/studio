@@ -12,8 +12,18 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Archive } from "lucide-react";
+import { Plus, Archive, Trash2 } from "lucide-react";
 import type { Aisle } from "@/lib/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 const initialAisles: { [storeId: string]: Aisle[] } = {
@@ -30,6 +40,7 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
 
   const [aisles, setAisles] = useState<Aisle[]>(initialAisles[storeId] || []);
   const [newAisleName, setNewAisleName] = useState("");
+  const [aisleToDelete, setAisleToDelete] = useState<Aisle | null>(null);
 
   const handleAddAisle = () => {
     if (newAisleName.trim()) {
@@ -43,19 +54,44 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
     }
   };
 
+  const handleDeleteAisle = (aisle: Aisle) => {
+    setAisles((prev) => prev.filter((s) => s.id !== aisle.id));
+    setAisleToDelete(null);
+  };
+
   return (
     <div className="space-y-6">
-        <Breadcrumb>
-            <BreadcrumbList>
-                <BreadcrumbItem>
-                    <BreadcrumbLink href="/dashboard/stores">Magasins</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                    <BreadcrumbPage>{storeName}</BreadcrumbPage>
-                </BreadcrumbItem>
-            </BreadcrumbList>
-        </Breadcrumb>
+      <AlertDialog
+        open={!!aisleToDelete}
+        onOpenChange={(open) => !open && setAisleToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous sûr?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le rayon "{aisleToDelete?.name}" et toutes ses données seront supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => aisleToDelete && handleDeleteAisle(aisleToDelete)}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/dashboard/stores">Magasins</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{storeName}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       <Card>
         <CardHeader>
@@ -69,7 +105,7 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
             placeholder="Nom du nouveau rayon"
             value={newAisleName}
             onChange={(e) => setNewAisleName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddAisle()}
+            onKeyDown={(e) => e.key === "Enter" && handleAddAisle()}
           />
           <Button onClick={handleAddAisle}>
             <Plus className="mr-2" />
@@ -80,12 +116,25 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {aisles.map((aisle) => (
-          <Link
-            key={aisle.id}
-            href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
-            passHref
-          >
-            <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+          <Card key={aisle.id} className="group relative transition-colors hover:bg-muted/50">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-7 w-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAisleToDelete(aisle);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Supprimer le rayon</span>
+            </Button>
+            <Link
+              href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
+              passHref
+              className="block h-full cursor-pointer"
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
                 <Archive className="h-5 w-5 text-muted-foreground" />
@@ -95,8 +144,8 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
                   Cliquez pour gérer les produits de ce rayon.
                 </div>
               </CardContent>
-            </Card>
-          </Link>
+            </Link>
+          </Card>
         ))}
       </div>
     </div>
