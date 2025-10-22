@@ -85,8 +85,8 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
     if (!user || !aisles || aisles.length === 0) {
       toast({
         variant: "destructive",
-        title: "لا توجد بيانات للتصدير",
-        description: "لا توجد أروقة أو منتجات في هذا المتجر.",
+        title: "Aucune donnée à exporter",
+        description: "Il n'y a aucun rayon ou produit dans ce magasin.",
       });
       return;
     }
@@ -105,8 +105,8 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
         if (allProducts.length === 0) {
           toast({
             variant: "destructive",
-            title: "لا توجد منتجات للتصدير",
-            description: "لم يتم العثور على أي منتجات في أروقة هذا المتجر.",
+            title: "Aucun produit à exporter",
+            description: "Aucun produit n'a été trouvé dans les rayons de ce magasin.",
           });
           return;
         }
@@ -122,16 +122,16 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
         saveAs(blob, `inventaire-complet-${store?.name}-${new Date().toISOString().split('T')[0]}.xlsx`);
 
         toast({
-          title: "اكتمل التصدير",
-          description: "تم تنزيل ملف المخزون الكامل بنجاح.",
+          title: "Exportation terminée",
+          description: "Le fichier d'inventaire complet a été téléchargé avec succès.",
         });
 
       } catch (error) {
         console.error("Failed to export all data:", error);
         toast({
           variant: "destructive",
-          title: "خطأ في التصدير",
-          description: "فشل تصدير البيانات. يرجى المحاولة مرة أخرى.",
+          title: "Erreur d'exportation",
+          description: "L'exportation des données a échoué. Veuillez réessayer.",
         });
       }
     });
@@ -187,7 +187,7 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
               ) : (
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
               )}
-              {isExporting ? "تصدير..." : "تصدير كل البيانات"}
+              {isExporting ? "Exportation..." : "Exporter tout"}
             </Button>
         </CardHeader>
         <CardContent className="flex gap-2">
