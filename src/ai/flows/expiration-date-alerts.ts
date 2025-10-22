@@ -15,7 +15,7 @@ const AnalyzeExpirationDatesInputSchema = z.object({
   products: z.array(
     z.object({
       barcode: z.string().describe('The barcode of the product.'),
-      expirationDate: z.string().describe('The expiration date of the product in YYYYMMDD format.'),
+      expirationDate: z.string().describe('The expiration date of the product in YYYY-MM-DD format.'),
       quantity: z.number().describe('The quantity of the product.'),
     })
   ).describe('A list of products with their expiration dates and quantities.'),
