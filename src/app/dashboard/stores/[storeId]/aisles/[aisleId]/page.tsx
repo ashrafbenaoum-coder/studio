@@ -50,20 +50,19 @@ const initialProducts: Product[] = [
   },
 ];
 
-export default function InventoryPage({ params }: { params: { storeId: string, aisleId: string } }) {
+export default function InventoryPage({ params: { storeId, aisleId } }: { params: { storeId: string, aisleId: string } }) {
   const { toast } = useToast();
   const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isPending, startTransition] = useTransition();
 
-  const { products, storeName, aisleName, storeId, aisleId } = useMemo(() => {
-    const { storeId, aisleId } = params;
+  const { products, storeName, aisleName } = useMemo(() => {
     const filteredProducts = allProducts.filter(p => p.storeId === storeId && p.aisleId === aisleId);
     // Mock data, in a real app, you'd fetch this.
     const sName = storeId === "1" ? "Magasin Principal" : "Entrepôt Sud";
     const aName = aisleId === "101" ? "Allée 1 - Frais" : aisleId === "102" ? "Allée 2 - Sec" : "Zone A";
-    return { products: filteredProducts, storeName: sName, aisleName: aName, storeId, aisleId };
-  }, [allProducts, params]);
+    return { products: filteredProducts, storeName: sName, aisleName: aName };
+  }, [allProducts, storeId, aisleId]);
 
 
   const addProduct = (product: Omit<Product, "id">) => {
