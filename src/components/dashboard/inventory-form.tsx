@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { MapPin, Barcode, Package, Calendar, Save, Camera } from "lucide-react";
+import { MapPin, Barcode, Package, Calendar, Save, Camera, Plus, Minus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -136,16 +137,36 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Quantité</FormLabel>
-                      <div className="relative">
+                      <div className="relative flex items-center">
                         <Package className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <FormControl>
                           <Input
                             type="number"
                             placeholder="0"
                             {...field}
-                            className="pl-10"
+                            className="pl-10 text-center"
                           />
                         </FormControl>
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center">
+                           <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => field.onChange(Math.max(0, field.value - 1))}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => field.onChange(field.value + 1)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <FormMessage />
                     </FormItem>
