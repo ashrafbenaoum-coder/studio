@@ -5,7 +5,8 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { MapPin, Barcode, Package, Calendar, Save, Camera, Plus, Minus } from "lucide-react";
+import { format } from "date-fns";
+import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +25,13 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 import { BarcodeScannerDialog } from "./barcode-scanner-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +40,9 @@ const formSchema = z.object({
   address: z.string().min(1, "Adresse est requise."),
   barcode: z.string().min(1, "Code barre est requis."),
   quantity: z.coerce.number().min(0, "La quantité ne peut pas être négative."),
-  expirationDate: z.string().min(1, "Date d'expiration est requise."),
+  expirationDate: z.date({
+    required_error: "Date d'expiration est requise.",
+  }),
 });
 
 type InventoryFormProps = {
@@ -48,12 +58,14 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
       address: "",
       barcode: "",
       quantity: 0,
-      expirationDate: "",
     },
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    onAddProduct(values);
+    onAddProduct({
+      ...values,
+      expirationDate: format(values.expirationDate, 'yyyy-MM-dd'),
+    });
     form.reset();
   }
 
@@ -176,14 +188,39 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                   control={form.control}
                   name="expirationDate"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Date d'expiration</FormLabel>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <FormControl>
-                          <Input type="date" {...field} className="pl-10" />
-                        </FormControl>
-                      </div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Choisir une date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
