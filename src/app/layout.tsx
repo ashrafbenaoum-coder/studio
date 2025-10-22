@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "StockFlow",
+  title: "GDS Inventaire",
   description: "Intelligent Inventory Management",
 };
 
