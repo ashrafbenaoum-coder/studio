@@ -3,83 +3,75 @@
 
 import { useState, useTransition, useMemo } from "react";
 import { runExpirationAnalysis } from "@/lib/actions";
-import type { Product, Alert } from "@/lib/types";
+import type { Product, Store, Aisle } from "@/lib/types";
 import { InventoryForm } from "@/components/dashboard/inventory-form";
 import { InventoryList } from "@/components/dashboard/inventory-list";
 import { ExpirationAlerts } from "@/components/dashboard/expiration-alerts";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import {
+  useCollection,
+  useDoc,
+  useFirestore,
+  useUser,
+  useMemoFirebase,
+  addDocumentNonBlocking,
+} from "@/firebase";
+import { collection, doc } from "firebase/firestore";
+import type { Alert } from "@/lib/types";
 
-const initialProducts: Product[] = [
-  {
-    id: "1",
-    address: "Aisle 3, Shelf 2",
-    barcode: "123456789012",
-    quantity: 10,
-    expirationDate: format(
-      new Date(new Date().setDate(new Date().getDate() + 5)),
-      "yyyy-MM-dd"
-    ),
-    storeId: "1",
-    aisleId: "101",
-  },
-  {
-    id: "2",
-    address: "Aisle 1, Fridge 1",
-    barcode: "234567890123",
-    quantity: 5,
-    expirationDate: format(
-      new Date(new Date().setDate(new Date().getDate() - 2)),
-      "yyyy-MM-dd"
-    ),
-    storeId: "1",
-    aisleId: "102",
-  },
-  {
-    id: "3",
-    address: "Aisle 5, Bin 4",
-    barcode: "345678901234",
-    quantity: 20,
-    expirationDate: format(
-      new Date(new Date().setDate(new Date().getDate() + 30)),
-      "yyyy-MM-dd"
-    ),
-    storeId: "2",
-    aisleId: "201",
-  },
-];
-
-export default function InventoryPage({ params: { storeId, aisleId } }: { params: { storeId: string, aisleId: string } }) {
+export default function InventoryPage({ params }: { params: { storeId: string; aisleId: string } }) {
+  const { storeId, aisleId } = params;
   const { toast } = useToast();
-  const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const storeDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, "users", user.uid, "stores", storeId) : null),
+    [firestore, user, storeId]
+  );
+  const { data: store } = useDoc<Omit<Store, "id">>(storeDocRef);
+  
+  const aisleDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId) : null),
+    [firestore, user, storeId, aisleId]
+  );
+  const { data: aisle } = useDoc<Omit<Aisle, "id">>(aisleDocRef);
+
+  const productsQuery = useMemoFirebase(
+    () =>
+      user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products") : null,
+    [firestore, user, storeId, aisleId]
+  );
+  const { data: products, isLoading: areProductsLoading } = useCollection<Omit<Product, "id">>(productsQuery);
+
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isPending, startTransition] = useTransition();
 
-  const { products, storeName, aisleName } = useMemo(() => {
-    const filteredProducts = allProducts.filter(p => p.storeId === storeId && p.aisleId === aisleId);
-    // Mock data, in a real app, you'd fetch this.
-    const sName = storeId === "1" ? "Magasin Principal" : "Entrepôt Sud";
-    const aName = aisleId === "101" ? "Allée 1 - Frais" : aisleId === "102" ? "Allée 2 - Sec" : "Zone A";
-    return { products: filteredProducts, storeName: sName, aisleName: aName };
-  }, [allProducts, storeId, aisleId]);
-
-
   const addProduct = (product: Omit<Product, "id">) => {
-    const newProduct = { 
-        ...product, 
-        id: new Date().getTime().toString(),
-        storeId: storeId,
-        aisleId: aisleId,
-    };
-    setAllProducts((prevProducts) => [newProduct, ...prevProducts]);
-    toast({
-      title: "Produit ajouté",
-      description: `Le produit avec le code barre ${product.barcode} a été enregistré.`,
-    });
+    if (productsQuery) {
+        const newProduct = { 
+            ...product, 
+            storeId: storeId,
+            aisleId: aisleId,
+        };
+        addDocumentNonBlocking(productsQuery, newProduct);
+        toast({
+          title: "Produit ajouté",
+          description: `Le produit avec le code barre ${product.barcode} a été enregistré.`,
+        });
+    }
   };
 
   const handleAnalysis = async () => {
+    if (!products || products.length === 0) {
+       toast({
+          variant: "destructive",
+          title: "Aucun produit",
+          description: "Il n'y a aucun produit à analyser.",
+        });
+      return;
+    }
     startTransition(async () => {
       setAlerts([]);
       try {
@@ -109,18 +101,18 @@ export default function InventoryPage({ params: { storeId, aisleId } }: { params
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                    <BreadcrumbLink href={`/dashboard/stores/${storeId}/aisles`}>{storeName}</BreadcrumbLink>
+                    <BreadcrumbLink href={`/dashboard/stores/${storeId}/aisles`}>{store?.name ?? '...'}</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                    <BreadcrumbPage>{aisleName}</BreadcrumbPage>
+                    <BreadcrumbPage>{aisle?.name ?? '...'}</BreadcrumbPage>
                 </BreadcrumbItem>
             </BreadcrumbList>
         </Breadcrumb>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <InventoryForm onAddProduct={addProduct} />
-            <InventoryList products={products} />
+            <InventoryList products={products || []} isLoading={areProductsLoading} />
           </div>
           <div className="lg:col-span-1">
             <ExpirationAlerts

@@ -13,12 +13,12 @@ export interface Aisle {
 
 export interface Product {
   id: string;
-  address: string; // This could be deprecated if we use aisles
+  address: string;
   barcode: string;
   quantity: number;
   expirationDate: string; // YYYY-MM-DD
-  aisleId?: string;
-  storeId?: string;
+  aisleId: string;
+  storeId: string;
 }
 
 export type Alert = AnalyzeExpirationDatesOutput[0];

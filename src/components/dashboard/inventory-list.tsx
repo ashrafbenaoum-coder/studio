@@ -45,11 +45,19 @@ function getStatus(expirationDate: string): {
   return { label: "En stock", variant: "default" };
 }
 
-export function InventoryList({ products }: { products: Product[] }) {
+export function InventoryList({ products, isLoading }: { products: Product[], isLoading: boolean }) {
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
 
   const handleExport = () => {
+    if (products.length === 0) {
+       toast({
+          variant: "destructive",
+          title: "Aucun produit à exporter",
+          description: "Ajoutez des produits à l'inventaire avant d'exporter.",
+        });
+        return;
+    }
     startExportTransition(async () => {
       try {
         const base64Data = await exportToExcel(products);
@@ -108,7 +116,16 @@ export function InventoryList({ products }: { products: Product[] }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.length === 0 ? (
+              {isLoading ? (
+                 <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : products.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={5}

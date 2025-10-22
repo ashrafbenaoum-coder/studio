@@ -4,7 +4,14 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, User as UserIcon } from "lucide-react";
+import {
+  initiateEmailSignIn,
+  initiateEmailSignUp,
+  initiateAnonymousSignIn,
+  useAuth,
+  useUser,
+} from "@/firebase";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   email: z
@@ -30,11 +38,14 @@ const formSchema = z.object({
     .email({ message: "Veuillez entrer une adresse email valide." }),
   password: z
     .string()
-    .min(1, { message: "Le mot de passe ne peut pas être vide." }),
+    .min(6, { message: "Le mot de passe doit contenir au moins 6 caractères." }),
 });
 
 export function LoginForm() {
   const router = useRouter();
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -43,10 +54,30 @@ export function LoginForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // NOTE: This is a mock login. In a real app, you'd call Firebase Auth here.
-    console.log(values);
-    router.push("/dashboard");
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, isUserLoading, router]);
+
+  const handleEmailSignIn = (values: z.infer<typeof formSchema>) => {
+    initiateEmailSignIn(auth, values.email, values.password);
+  };
+
+  const handleEmailSignUp = (values: z.infer<typeof formSchema>) => {
+    initiateEmailSignUp(auth, values.email, values.password);
+  };
+
+  const handleAnonymousSignIn = () => {
+    initiateAnonymousSignIn(auth);
+  };
+  
+  if (isUserLoading || user) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+            <p>Loading...</p>
+        </div>
+      )
   }
 
   return (
@@ -61,7 +92,10 @@ export function LoginForm() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(handleEmailSignIn)}
+            className="space-y-6"
+          >
             <FormField
               control={form.control}
               name="email"
@@ -103,9 +137,38 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full !mt-8">
-              Se connecter
-            </Button>
+            <div className="!mt-8 flex flex-col gap-2">
+              <Button type="submit" className="w-full">
+                Se connecter
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={form.handleSubmit(handleEmailSignUp)}
+              >
+                S'inscrire
+              </Button>
+               <div className="relative my-2">
+                <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                    Ou continuer avec
+                    </span>
+                </div>
+              </div>
+               <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={handleAnonymousSignIn}
+                >
+                <UserIcon className="mr-2 h-4 w-4" />
+                Connexion Anonyme
+                </Button>
+            </div>
           </form>
         </Form>
       </CardContent>

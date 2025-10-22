@@ -1,40 +1,82 @@
+
 {
   "entities": {
-    "InventoryItem": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "InventoryItem",
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile information.",
       "type": "object",
-      "description": "Represents an item in the inventory.",
       "properties": {
-        "id": {
+        "displayName": {
           "type": "string",
-          "description": "Unique identifier for the inventory item."
+          "description": "The user's display name."
         },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        }
+      }
+    },
+    "Store": {
+      "title": "Store",
+      "description": "Represents a physical store location.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the store."
+        }
+      },
+      "required": ["name"]
+    },
+    "Aisle": {
+      "title": "Aisle",
+      "description": "Represents an aisle within a store.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name or number of the aisle."
+        },
+        "storeId": {
+          "type": "string",
+          "description": "The ID of the store this aisle belongs to."
+        }
+      },
+      "required": ["name", "storeId"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Represents an inventory item.",
+      "type": "object",
+      "properties": {
         "address": {
           "type": "string",
-          "description": "The storage address of the item."
+          "description": "The specific location of the product within the aisle."
         },
         "barcode": {
           "type": "string",
-          "description": "The barcode of the item."
+          "description": "The product's barcode."
         },
         "quantity": {
           "type": "number",
-          "description": "The quantity of the item in stock."
+          "description": "The number of units in stock."
         },
         "expirationDate": {
           "type": "string",
-          "description": "The expiration date of the item (yyyymmdd).",
-          "format": "date-time"
+          "format": "date",
+          "description": "The expiration date in YYYY-MM-DD format."
+        },
+        "storeId": {
+          "type": "string",
+          "description": "The ID of the store this product belongs to."
+        },
+        "aisleId": {
+          "type": "string",
+          "description": "The ID of the aisle this product belongs to."
         }
       },
-      "required": [
-        "id",
-        "address",
-        "barcode",
-        "quantity",
-        "expirationDate"
-      ]
+      "required": ["address", "barcode", "quantity", "expirationDate", "storeId", "aisleId"]
     }
   },
   "auth": {
@@ -44,28 +86,21 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}/inventoryItems/{itemId}",
-        "definition": {
-          "entityName": "InventoryItem",
-          "schema": {
-            "$ref": "#/backend/entities/InventoryItem"
-          },
-          "description": "Stores inventory items associated with a specific user. Each user has their own collection of inventory items. Path-based ownership ensures that only the authenticated user can access these items.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "itemId",
-              "description": "The unique identifier of the inventory item."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to store inventory items, associating each item with the user who created it.  Each user will have their own collection of inventory items, ensuring data isolation and straightforward ownership. This design promotes Authorization Independence by eliminating the need for `get()` calls in security rules. The structure uses path-based ownership (`/users/{userId}/inventoryItems/{itemId}`), ensuring that only the authenticated user has access to their inventory items. This approach supports secure `list` operations (QAPs) because security rules can efficiently filter items based on the user ID in the path. Timestamps aren't explicitly part of the data structure, but Firestore automatically creates `createTime` and `updateTime` timestamps for each document, which can be leveraged if needed. No denormalization is needed because ownership is implicit in the path."
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profile information, accessible only by the user themselves."
+    },
+    "/users/{userId}/stores/{storeId}": {
+      "schema": { "$ref": "#/entities/Store" },
+      "description": "Stores created by a specific user."
+    },
+    "/users/{userId}/stores/{storeId}/aisles/{aisleId}": {
+      "schema": { "$ref": "#/entities/Aisle" },
+      "description": "Aisles within a specific store belonging to a user."
+    },
+    "/users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Products within a specific aisle, in a specific store, belonging to a user."
+    }
   }
 }

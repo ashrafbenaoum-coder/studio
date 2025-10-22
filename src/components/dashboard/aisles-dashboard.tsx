@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Archive, Trash2 } from "lucide-react";
-import type { Aisle } from "@/lib/types";
+import { Plus, Archive, Trash2, Loader2 } from "lucide-react";
+import type { Aisle, Store } from "@/lib/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,39 +25,57 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-
-const initialAisles: { [storeId: string]: Aisle[] } = {
-  "1": [
-    { id: "101", name: "Allée 1 - Frais", storeId: "1" },
-    { id: "102", name: "Allée 2 - Sec", storeId: "1" },
-  ],
-  "2": [{ id: "201", name: "Zone A", storeId: "2" }],
-};
+import {
+  useCollection,
+  useDoc,
+  useFirestore,
+  useUser,
+  useMemoFirebase,
+  addDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from "@/firebase";
+import { collection, doc } from "firebase/firestore";
 
 export function AislesDashboard({ storeId }: { storeId: string }) {
-  // In a real app, you'd fetch this data.
-  const storeName = storeId === "1" ? "Magasin Principal" : "Entrepôt Sud";
+  const { user } = useUser();
+  const firestore = useFirestore();
 
-  const [aisles, setAisles] = useState<Aisle[]>(initialAisles[storeId] || []);
+  const storeDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, "users", user.uid, "stores", storeId) : null),
+    [firestore, user, storeId]
+  );
+  const { data: store, isLoading: isStoreLoading } = useDoc<Omit<Store, "id">>(storeDocRef);
+
+  const aislesQuery = useMemoFirebase(
+    () =>
+      user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles") : null,
+    [firestore, user, storeId]
+  );
+  const { data: aisles, isLoading: areAislesLoading } = useCollection<Omit<Aisle, "id">>(aislesQuery);
+
   const [newAisleName, setNewAisleName] = useState("");
   const [aisleToDelete, setAisleToDelete] = useState<Aisle | null>(null);
 
   const handleAddAisle = () => {
-    if (newAisleName.trim()) {
-      const newAisle: Aisle = {
-        id: new Date().getTime().toString(),
+    if (newAisleName.trim() && user && aislesQuery) {
+      const newAisle = {
         name: newAisleName.trim(),
         storeId,
       };
-      setAisles((prev) => [...prev, newAisle]);
+      addDocumentNonBlocking(aislesQuery, newAisle);
       setNewAisleName("");
     }
   };
 
   const handleDeleteAisle = (aisle: Aisle) => {
-    setAisles((prev) => prev.filter((s) => s.id !== aisle.id));
-    setAisleToDelete(null);
+    if (user) {
+      const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisle.id);
+      deleteDocumentNonBlocking(docRef);
+      setAisleToDelete(null);
+    }
   };
+
+  const isLoading = isStoreLoading || areAislesLoading;
 
   return (
     <div className="space-y-6">
@@ -88,14 +106,14 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>{storeName}</BreadcrumbPage>
+            <BreadcrumbPage>{store?.name ?? 'Chargement...'}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <Card>
         <CardHeader>
-          <CardTitle>Gérer les rayons pour {storeName}</CardTitle>
+          <CardTitle>Gérer les rayons pour {store?.name ?? '...'}</CardTitle>
           <CardDescription>
             Ajoutez un nouveau rayon ou sélectionnez-en un pour gérer son inventaire.
           </CardDescription>
@@ -113,41 +131,50 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
           </Button>
         </CardContent>
       </Card>
+      
+      {isLoading && <Loader2 className="mx-auto my-8 h-8 w-8 animate-spin text-primary" />}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {aisles.map((aisle) => (
-          <Card key={aisle.id} className="group relative transition-colors hover:bg-muted/50">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 h-7 w-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setAisleToDelete(aisle);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Supprimer le rayon</span>
-            </Button>
-            <Link
-              href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
-              passHref
-              className="block h-full cursor-pointer"
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
-                <Archive className="h-5 w-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">
-                  Cliquez pour gérer les produits de ce rayon.
-                </div>
-              </CardContent>
-            </Link>
-          </Card>
-        ))}
-      </div>
+      {!isLoading && aisles && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {aisles.map((aisle) => (
+            <Card key={aisle.id} className="group relative transition-colors hover:bg-muted/50">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAisleToDelete(aisle);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Supprimer le rayon</span>
+              </Button>
+              <Link
+                href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
+                passHref
+                className="block h-full cursor-pointer"
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
+                  <Archive className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xs text-muted-foreground">
+                    Cliquez pour gérer les produits de ce rayon.
+                  </div>
+                </CardContent>
+              </Link>
+            </Card>
+          ))}
+        </div>
+      )}
+      {!isLoading && aisles?.length === 0 && (
+         <div className="pt-4 text-center text-sm text-muted-foreground">
+            Aucun rayon trouvé pour ce magasin.
+        </div>
+      )}
     </div>
   );
 }
