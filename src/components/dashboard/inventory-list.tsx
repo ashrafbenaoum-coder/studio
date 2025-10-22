@@ -17,10 +17,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { differenceInDays, parseISO } from "date-fns";
-import { FileSpreadsheet } from "lucide-react";
-import * as XLSX from "xlsx";
 
 function getStatus(expirationDate: string): {
   label: string;
@@ -41,20 +38,6 @@ function getStatus(expirationDate: string): {
 }
 
 export function InventoryList({ products }: { products: Product[] }) {
-  const handleExport = () => {
-    const dataToExport = products.map((product) => ({
-      "Code Barre": product.barcode,
-      Adresse: product.address,
-      Quantité: product.quantity,
-      "Date d'expiration": product.expirationDate,
-      Statut: getStatus(product.expirationDate).label,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventaire");
-    XLSX.writeFile(workbook, "inventaire_stockflow.xlsx");
-  };
 
   return (
     <Card>
@@ -65,10 +48,6 @@ export function InventoryList({ products }: { products: Product[] }) {
             Liste de tous les produits actuellement en stock.
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          <FileSpreadsheet className="mr-2 h-4 w-4" />
-          Exporter
-        </Button>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

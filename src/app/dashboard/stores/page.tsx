@@ -1,5 +1,5 @@
 import { StoresDashboard } from "@/components/dashboard/stores-dashboard";
 
-export default function DashboardPage() {
+export default function StoresPage() {
   return <StoresDashboard />;
 }

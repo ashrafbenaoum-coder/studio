@@ -5,6 +5,7 @@ import {
   type AnalyzeExpirationDatesInput,
 } from "@/ai/flows/expiration-date-alerts";
 import type { Product } from "@/lib/types";
+import * as XLSX from "xlsx";
 
 export async function runExpirationAnalysis(products: Product[]) {
   const input: AnalyzeExpirationDatesInput = {
@@ -25,4 +26,21 @@ export async function runExpirationAnalysis(products: Product[]) {
     console.error("AI analysis failed:", error);
     throw new Error("Failed to get suggestions from AI.");
   }
+}
+
+export async function exportToExcel(products: Product[]) {
+    const dataToExport = products.map((product) => ({
+      "Code Barre": product.barcode,
+      Adresse: product.address,
+      Quantité: product.quantity,
+      "Date d'expiration": product.expirationDate,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventaire");
+    
+    // This part is tricky on the server. We'll return the data and handle download on client.
+    const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    return Buffer.from(buf).toString('base64');
 }
