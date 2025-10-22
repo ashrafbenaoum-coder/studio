@@ -51,26 +51,27 @@ const initialProducts: Product[] = [
 ];
 
 export default function InventoryPage({ params }: { params: { storeId: string, aisleId: string } }) {
+  const { storeId, aisleId } = params;
   const { toast } = useToast();
   const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
   
   const products = useMemo(() => {
-    return allProducts.filter(p => p.storeId === params.storeId && p.aisleId === params.aisleId);
-  }, [allProducts, params.storeId, params.aisleId]);
+    return allProducts.filter(p => p.storeId === storeId && p.aisleId === aisleId);
+  }, [allProducts, storeId, aisleId]);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isPending, startTransition] = useTransition();
 
   // Mock data, in a real app, you'd fetch this.
-  const storeName = params.storeId === "1" ? "Magasin Principal" : "Entrepôt Sud";
-  const aisleName = params.aisleId === "101" ? "Allée 1 - Frais" : params.aisleId === "102" ? "Allée 2 - Sec" : "Zone A";
+  const storeName = storeId === "1" ? "Magasin Principal" : "Entrepôt Sud";
+  const aisleName = aisleId === "101" ? "Allée 1 - Frais" : aisleId === "102" ? "Allée 2 - Sec" : "Zone A";
 
   const addProduct = (product: Omit<Product, "id">) => {
     const newProduct = { 
         ...product, 
         id: new Date().getTime().toString(),
-        storeId: params.storeId,
-        aisleId: params.aisleId,
+        storeId: storeId,
+        aisleId: aisleId,
     };
     setAllProducts((prevProducts) => [newProduct, ...prevProducts]);
     toast({
@@ -109,7 +110,7 @@ export default function InventoryPage({ params }: { params: { storeId: string, a
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                    <BreadcrumbLink href={`/dashboard/stores/${params.storeId}/aisles`}>{storeName}</BreadcrumbLink>
+                    <BreadcrumbLink href={`/dashboard/stores/${storeId}/aisles`}>{storeName}</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
