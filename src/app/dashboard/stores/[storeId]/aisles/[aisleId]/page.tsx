@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { runExpirationAnalysis } from "@/lib/actions";
 import type { Product, Alert } from "@/lib/types";
 import { InventoryForm } from "@/components/dashboard/inventory-form";
@@ -52,9 +52,12 @@ const initialProducts: Product[] = [
 
 export default function InventoryPage({ params }: { params: { storeId: string, aisleId: string } }) {
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>(
-    initialProducts.filter(p => p.storeId === params.storeId && p.aisleId === params.aisleId)
-  );
+  const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
+  
+  const products = useMemo(() => {
+    return allProducts.filter(p => p.storeId === params.storeId && p.aisleId === params.aisleId);
+  }, [allProducts, params.storeId, params.aisleId]);
+
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isPending, startTransition] = useTransition();
 
@@ -69,7 +72,7 @@ export default function InventoryPage({ params }: { params: { storeId: string, a
         storeId: params.storeId,
         aisleId: params.aisleId,
     };
-    setProducts((prevProducts) => [newProduct, ...prevProducts]);
+    setAllProducts((prevProducts) => [newProduct, ...prevProducts]);
     toast({
       title: "Produit ajouté",
       description: `Le produit avec le code barre ${product.barcode} a été enregistré.`,
