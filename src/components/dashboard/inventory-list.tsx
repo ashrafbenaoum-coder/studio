@@ -1,8 +1,9 @@
 
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition } from "react";
 import type { Product } from "@/lib/types";
+import { getStatus } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -21,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, Loader2, Trash2, Pencil } from "lucide-react";
-import { differenceInDays, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/actions";
 import { saveAs } from 'file-saver';
@@ -40,46 +40,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-
-function formatToISODate(dateStr: string): string | null {
-    if (!/^\d{8}$/.test(dateStr)) {
-      return dateStr; 
-    }
-    const year = dateStr.substring(0, 4);
-    const month = dateStr.substring(4, 6);
-    const day = dateStr.substring(6, 8);
-    return `${year}-${month}-${day}`;
-}
-
-
-function getStatus(expirationDate: string): {
-  label: string;
-  variant: "default" | "secondary" | "destructive";
-} {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isoDate = formatToISODate(expirationDate);
-  if (!isoDate) {
-    return { label: "Date invalide", variant: "destructive"};
-  }
-  const expDate = parseISO(isoDate);
-  const daysDiff = differenceInDays(expDate, today);
-
-  if (daysDiff < 0) {
-    return { label: "Expiré", variant: "destructive" };
-  }
-  if (daysDiff <= 7) {
-    return { label: "Expire bientôt", variant: "secondary" };
-  }
-  return { label: "En stock", variant: "default" };
-}
 
 type InventoryListProps = {
   products: Product[];

@@ -6,6 +6,7 @@ import {
   type AnalyzeExpirationDatesInput,
 } from "@/ai/flows/expiration-date-alerts";
 import type { Product } from "@/lib/types";
+import { getStatus } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
 function formatToISODate(dateStr: string): string {
@@ -40,11 +41,13 @@ export async function runExpirationAnalysis(products: Product[]) {
 
 export async function exportToExcel(products: (Product & { storeName?: string; aisleName?: string })[]) {
     const dataToExport = products.map((product) => {
+      const status = getStatus(product.expirationDate);
       const record: any = {
-        "Code Barre": product.barcode,
         Adresse: product.address,
+        "Produit (Code Barre)": product.barcode,
         Quantité: product.quantity,
         "Date d'expiration": product.expirationDate,
+        Statut: status.label,
       };
       if (product.storeName) {
         record["Nom du Magasin"] = product.storeName;
@@ -54,17 +57,18 @@ export async function exportToExcel(products: (Product & { storeName?: string; a
       }
       return record;
     });
-    
-    // Reorder keys to ensure Magasin and Rayon are first if they exist
+
     const orderedData = dataToExport.map(item => {
         const orderedItem: any = {};
         if (item["Nom du Magasin"]) orderedItem["Nom du Magasin"] = item["Nom du Magasin"];
         if (item["Nom du Rayon"]) orderedItem["Nom du Rayon"] = item["Nom du Rayon"];
-        for (const key in item) {
-            if (key !== "Nom du Magasin" && key !== "Nom du Rayon") {
-                orderedItem[key] = item[key];
-            }
-        }
+        
+        orderedItem["Adresse"] = item["Adresse"];
+        orderedItem["Produit (Code Barre)"] = item["Produit (Code Barre)"];
+        orderedItem["Quantité"] = item["Quantité"];
+        orderedItem["Date d'expiration"] = item["Date d'expiration"];
+        orderedItem["Statut"] = item["Statut"];
+
         return orderedItem;
     });
 
@@ -75,4 +79,3 @@ export async function exportToExcel(products: (Product & { storeName?: string; a
     const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     return Buffer.from(buf).toString('base64');
 }
-
