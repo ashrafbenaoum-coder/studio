@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -139,6 +139,11 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
 
   const isLoading = isStoreLoading || areAislesLoading;
 
+  const sortedAisles = useMemo(() => {
+    if (!aisles) return [];
+    return [...aisles].sort((a, b) => a.name.localeCompare(b.name));
+  }, [aisles]);
+
   return (
     <div className="space-y-6">
       <AlertDialog
@@ -206,9 +211,9 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
       
       {isLoading && <Loader2 className="mx-auto my-8 h-8 w-8 animate-spin text-primary" />}
 
-      {!isLoading && aisles && (
+      {!isLoading && sortedAisles && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {aisles.map((aisle) => (
+          {sortedAisles.map((aisle) => (
             <Card key={aisle.id} className="group relative transition-colors hover:bg-muted/50">
               <Button
                 variant="ghost"
@@ -242,7 +247,7 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
           ))}
         </div>
       )}
-      {!isLoading && aisles?.length === 0 && (
+      {!isLoading && sortedAisles?.length === 0 && (
          <div className="pt-4 text-center text-sm text-muted-foreground">
             Aucun rayon trouvé pour ce magasin.
         </div>
