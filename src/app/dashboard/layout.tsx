@@ -6,10 +6,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, FileSpreadsheet } from "lucide-react";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
-import { ExportButton } from "@/components/dashboard/export-button";
 
 export default function DashboardLayout({
   children,
@@ -24,7 +22,6 @@ export default function DashboardLayout({
             <Logo />
           </Link>
           <div className="flex items-center gap-2">
-            <ExportButton />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
