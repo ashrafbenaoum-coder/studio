@@ -1,64 +1,131 @@
 /**
- * @fileoverview Firestore Security Rules for the inventory management application.
+ * @fileoverview Firestore Security Rules for the Inventory Management application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model, where each user has full control over their own inventory items.
+ * This ruleset enforces a strict user-ownership model. Each user has a private data tree rooted at `/users/{userId}`.
+ * Only the authenticated user can read and write their own profile and associated store, aisle, and product data.
  *
  * Data Structure:
- * All inventory item data is nested under /users/{userId}/inventoryItems/{itemId}, ensuring data isolation between users.
+ * The Firestore database is structured as follows:
+ * - `/users/{userId}`: User profile information.
+ * - `/users/{userId}/stores/{storeId}`: Stores owned by the user.
+ * - `/users/{userId}/stores/{storeId}/aisles/{aisleId}`: Aisles within a user's store.
+ * - `/users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}`: Products within a user's aisle.
  *
  * Key Security Decisions:
- * - Users can only access inventory items that belong to them.
- * - Data validation is relaxed to allow rapid prototyping. Only authorization-critical fields are validated.
- *
- * Denormalization for Authorization:
- * Path-based ownership eliminates the need for denormalization, as the user ID is embedded in the document path.
+ * - Users can only access their own data.
+ * - Data is strictly segregated by user ID in the path.
+ * - Data shape is not heavily validated in this prototyping phase to allow for rapid iteration.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to inventory items for a specific user.
-     * @path /users/{userId}/inventoryItems/{itemId}
-     * @allow (create) - User A creates a new inventory item with id 'item1' under /users/A/inventoryItems/item1.
-     * @allow (get) - User A retrieves their inventory item with id 'item1' from /users/A/inventoryItems/item1.
-     * @allow (update) - User A updates their inventory item with id 'item1' at /users/A/inventoryItems/item1.
-     * @allow (delete) - User A deletes their inventory item with id 'item1' from /users/A/inventoryItems/item1.
-     * @deny (create) - User B attempts to create an inventory item under User A's path (/users/A/inventoryItems/item1).
-     * @deny (get) - User B attempts to retrieve an inventory item from User A's path (/users/A/inventoryItems/item1).
-     * @deny (update) - User B attempts to update an inventory item in User A's path (/users/A/inventoryItems/item1).
-     * @deny (delete) - User B attempts to delete an inventory item from User A's path (/users/A/inventoryItems/item1).
-     * @principle Enforces document ownership for writes. Restricts access to a user's own data tree. Validates relational integrity between documents.
+     * @description Checks if the user is signed in.
      */
-    match /users/{userId}/inventoryItems/{itemId} {
-      // Helper function to check if the user is signed in
-      function isSignedIn() {
-        return request.auth != null;
-      }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-      // Helper function to check if the requested user ID matches the authenticated user ID
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-      // Helper function to check if the user is the owner and the resource exists
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
+    /**
+     * @description Checks if the authenticated user is the owner of the existing document.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
 
-      // Allow anyone to read any data as long as the user is signed in.
-      allow get: if isSignedIn() && isOwner(userId);
-      // Allow the user to list all of their own documents.
-      allow list: if isSignedIn() && isOwner(userId);
+    /**
+     * @description Rules for user profile documents.
+     * @path /users/{userId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create their own profile at /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1.
+     * @deny (create) User 'attackerId' cannot create a profile for user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (get) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can read their own profile.
+     * @deny (get) User 'attackerId' cannot read the profile of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (update) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update their own profile.
+     * @deny (update) User 'attackerId' cannot update the profile of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete their own profile.
+     * @deny (delete) User 'attackerId' cannot delete the profile of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @principle Enforces document ownership for all operations on user profiles.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.email == request.auth.token.email;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
 
-      // Only allow the user to create a document if their user ID matches the userId in the path.
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == itemId;
+    /**
+     * @description Rules for store documents within a user's profile.
+     * @path /users/{userId}/stores/{storeId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create a store under their profile.
+     * @deny (create) User 'attackerId' cannot create a store under the profile of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (get) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can read their own store.
+     * @deny (get) User 'attackerId' cannot read the store of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (update) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update their own store.
+     * @deny (update) User 'attackerId' cannot update the store of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete their own store.
+     * @deny (delete) User 'attackerId' cannot delete the store of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     *  @allow (list) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can list their own stores.
+     * @principle Enforces document ownership for all operations on stores.
+     */
+    match /users/{userId}/stores/{storeId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
 
-      // Only allow the user to update a document if their user ID matches the userId in the path and the document exists. Also, enforce immutability of the userId.
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+    /**
+     * @description Rules for aisle documents within a user's store.
+     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create an aisle within their store.
+     * @deny (create) User 'attackerId' cannot create an aisle within the store of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (get) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can read their own aisle.
+     * @deny (get) User 'attackerId' cannot read the aisle of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (update) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update their own aisle.
+     * @deny (update) User 'attackerId' cannot update the aisle of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete their own aisle.
+     * @deny (delete) User 'attackerId' cannot delete the aisle of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (list) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can list their own aisles.
+     * @principle Enforces document ownership for all operations on aisles.
+     */
+    match /users/{userId}/stores/{storeId}/aisles/{aisleId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
 
-      // Only allow the user to delete a document if their user ID matches the userId in the path and the document exists.
+    /**
+     * @description Rules for product documents within a user's aisle.
+     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create a product within their aisle.
+     * @deny (create) User 'attackerId' cannot create a product within the aisle of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (get) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can read their own product.
+     * @deny (get) User 'attackerId' cannot read the product of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (update) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update their own product.
+     * @deny (update) User 'attackerId' cannot update the product of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete their own product.
+     * @deny (delete) User 'attackerId' cannot delete the product of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
+     * @allow (list) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can list their own products.
+     * @principle Enforces document ownership for all operations on products.
+     */
+    match /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
   }
