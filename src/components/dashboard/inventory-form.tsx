@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 import { BarcodeScannerDialog } from "./barcode-scanner-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { DayPicker } from "react-day-picker";
 
 const formSchema = z.object({
   address: z.string().min(1, "Adresse est requise."),
@@ -191,26 +192,35 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                     <FormItem className="flex flex-col">
                       <FormLabel>Date d'expiration</FormLabel>
                       <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Choisir une date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              value={field.value ? format(field.value, "y-MM-dd") : ""}
+                              onChange={(e) => {
+                                const date = new Date(e.target.value);
+                                if (!isNaN(date.getTime())) {
+                                  field.onChange(date);
+                                }
+                              }}
+                              placeholder="YYYY-MM-DD"
+                            />
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"ghost"}
+                                size="icon"
+                                className={cn(
+                                  "absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="h-4 w-4" />
+                                <span className="sr-only">Ouvrir le calendrier</span>
+                              </Button>
+                            </PopoverTrigger>
+                          </div>
+                        </FormControl>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
+                          <DayPicker
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
