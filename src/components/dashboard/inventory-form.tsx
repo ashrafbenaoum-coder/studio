@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { format } from "date-fns";
-import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus } from "lucide-react";
+import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus, Calculator } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ import type { Product } from "@/lib/types";
 import { BarcodeScannerDialog } from "./barcode-scanner-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { DayPicker } from "react-day-picker";
+import { CalculatorPopover } from "./calculator-popover";
 
 const formSchema = z.object({
   address: z.string().min(1, "Adresse est requise."),
@@ -150,23 +151,29 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Quantité</FormLabel>
-                      <div className="relative flex items-center">
+                       <div className="relative flex items-center">
                         <Package className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <FormControl>
                           <Input
                             type="number"
                             placeholder="0"
                             {...field}
-                            className="pl-10 text-center"
+                            className="pl-10 pr-[88px] text-center"
                           />
                         </FormControl>
-                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center">
-                           <Button
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
+                          <CalculatorPopover
+                            value={field.value}
+                            onValueChange={(val) => field.onChange(val)}
+                          />
+                          <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
-                            onClick={() => field.onChange(Math.max(0, field.value - 1))}
+                            className="h-8 w-8"
+                            onClick={() =>
+                              field.onChange(Math.max(0, field.value - 1))
+                            }
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
@@ -174,7 +181,7 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-8 w-8"
                             onClick={() => field.onChange(field.value + 1)}
                           >
                             <Plus className="h-4 w-4" />
