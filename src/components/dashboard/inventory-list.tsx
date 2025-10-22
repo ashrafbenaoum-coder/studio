@@ -26,6 +26,16 @@ import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/actions";
 import { saveAs } from 'file-saver';
 
+function formatToISODate(dateStr: string): string | null {
+    if (!/^\d{8}$/.test(dateStr)) {
+      return dateStr; 
+    }
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    return `${year}-${month}-${day}`;
+}
+
 
 function getStatus(expirationDate: string): {
   label: string;
@@ -33,7 +43,11 @@ function getStatus(expirationDate: string): {
 } {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const expDate = parseISO(expirationDate);
+  const isoDate = formatToISODate(expirationDate);
+  if (!isoDate) {
+    return { label: "Date invalide", variant: "destructive"};
+  }
+  const expDate = parseISO(isoDate);
   const daysDiff = differenceInDays(expDate, today);
 
   if (daysDiff < 0) {

@@ -35,7 +35,7 @@ const formSchema = z.object({
   address: z.string().min(1, "Adresse est requise."),
   barcode: z.string().min(1, "Code barre est requis."),
   quantity: z.coerce.number().min(0, "La quantité ne peut pas être négative."),
-  expirationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD."),
+  expirationDate: z.string().regex(/^\d{8}$/, "La date doit être au format YYYYMMDD."),
 });
 
 type InventoryFormProps = {
@@ -191,7 +191,7 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                          <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                          <FormControl>
                             <Input
-                              placeholder="YYYY-MM-DD"
+                              placeholder="YYYYMMDD"
                               {...field}
                               className="pl-10"
                             />

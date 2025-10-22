@@ -1,3 +1,4 @@
+
 "use server";
 
 import {
@@ -11,8 +12,7 @@ export async function runExpirationAnalysis(products: Product[]) {
   const input: AnalyzeExpirationDatesInput = {
     products: products.map((p) => ({
       barcode: p.barcode,
-      // Convert YYYY-MM-DD from date picker to YYYYMMDD for the AI flow
-      expirationDate: p.expirationDate.replace(/-/g, ""),
+      expirationDate: p.expirationDate,
       quantity: p.quantity,
     })),
     businessRules:

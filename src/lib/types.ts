@@ -1,3 +1,4 @@
+
 import type { AnalyzeExpirationDatesOutput } from "@/ai/flows/expiration-date-alerts";
 
 export interface Store {
@@ -16,7 +17,7 @@ export interface Product {
   address: string;
   barcode: string;
   quantity: number;
-  expirationDate: string; // YYYY-MM-DD
+  expirationDate: string; // YYYYMMDD
   aisleId: string;
   storeId: string;
 }
