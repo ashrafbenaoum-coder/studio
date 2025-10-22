@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -28,94 +29,83 @@ export function BarcodeScannerDialog({
     boolean | undefined
   >(undefined);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const codeReaderRef = useRef(new BrowserMultiFormatReader());
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    let stream: MediaStream | undefined;
 
-    const codeReader = new BrowserMultiFormatReader();
-    let stream: MediaStream;
+    const startScanner = async () => {
+      if (!videoRef.current) return;
 
-    const getCameraPermission = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // Prefer the rear camera ('environment')
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
         setHasCameraPermission(true);
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          codeReader
-            .decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
-              if (result) {
-                onScan(result.getText());
-              }
-              if (err && !(err instanceof NotFoundException)) {
-                console.error(err);
-                toast({
-                  variant: "destructive",
-                  title: "Erreur du scanner",
-                  description: "Une erreur s'est produite avec le scanner de code-barres.",
-                });
-                onOpenChange(false);
-              }
-            })
-            .catch((err) => {
-               if (err.name === "NotAllowedError") {
-                  setHasCameraPermission(false);
-                  toast({
-                    variant: "destructive",
-                    title: "Accès à la caméra refusé",
-                    description:
-                      "Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
-                  });
-                } else {
-                  console.error("Barcode scanner error:", err);
-                  toast({
-                    variant: "destructive",
-                    title: "Erreur du scanner",
-                    description: "Une erreur s'est produite avec le scanner de code-barres.",
-                  });
-                }
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+           videoRef.current?.play();
+        };
+
+        await codeReaderRef.current.decodeFromStream(stream, videoRef.current, (result, err) => {
+          if (result) {
+            onScan(result.getText());
+          }
+          if (err && !(err instanceof NotFoundException)) {
+            console.error("Barcode scanning error:", err);
+            toast({
+              variant: "destructive",
+              title: "Erreur du scanner",
+              description:
+                "Une erreur inattendue est survenue avec le scanner.",
             });
-        }
+            onOpenChange(false);
+          }
+        });
       } catch (error: any) {
+        console.error("Camera access error:", error);
+        setHasCameraPermission(false);
         if (error.name === "NotAllowedError") {
-          setHasCameraPermission(false);
           toast({
             variant: "destructive",
             title: "Accès à la caméra refusé",
             description:
-              "Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
+              "Veuillez autoriser l'accès à la caméra pour utiliser cette fonctionnalité.",
           });
         } else {
-          console.error("Error accessing camera:", error);
-          setHasCameraPermission(false);
-          toast({
+           toast({
             variant: "destructive",
-            title: "Camera Access Denied",
-            description:
-              "Please enable camera permissions in your browser settings to use this app.",
+            title: "Erreur de caméra",
+            description: "Impossible d'accéder à la caméra. Assurez-vous qu'elle n'est pas utilisée par une autre application.",
           });
         }
       }
     };
-
-    getCameraPermission();
+    
+    if (open) {
+      startScanner();
+    }
 
     return () => {
-      codeReader.reset();
+      // Clean up resources
+      codeReaderRef.current.reset();
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     };
   }, [open, onScan, onOpenChange, toast]);
-  
+
   const handleOpenChange = (isOpen: boolean) => {
-    if(isOpen) {
+    if (isOpen) {
       setHasCameraPermission(undefined);
     }
     onOpenChange(isOpen);
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -123,25 +113,30 @@ export function BarcodeScannerDialog({
         <DialogHeader>
           <DialogTitle>Scanner le code barre</DialogTitle>
           <DialogDescription>
-            Pointez la caméra de votre appareil sur le code-barres du produit.
+            Pointez la caméra arrière de votre appareil sur le code-barres.
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4 rounded-md overflow-hidden border">
-          <video ref={videoRef} className="w-full aspect-video rounded-md" autoPlay muted playsInline />
+        <div className="mt-4 rounded-md overflow-hidden border relative bg-muted">
+          <video
+            ref={videoRef}
+            className="w-full aspect-video rounded-md"
+            muted
+            playsInline
+          />
           {hasCameraPermission === undefined && (
-             <div className="absolute inset-0 bg-muted flex items-center justify-center">
-                <p className="text-muted-foreground">En attente de la caméra...</p>
-             </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-muted-foreground">En attente de la caméra...</p>
+            </div>
           )}
           {hasCameraPermission === false && (
-             <div className="absolute inset-0 bg-muted flex items-center justify-center p-4">
-                <Alert variant="destructive">
-                  <AlertTitle>Accès à la caméra requis</AlertTitle>
-                  <AlertDescription>
-                    Veuillez autoriser l'accès à la caméra pour utiliser cette fonctionnalité.
-                  </AlertDescription>
-                </Alert>
-             </div>
+            <div className="absolute inset-0 flex items-center justify-center p-4">
+              <Alert variant="destructive">
+                <AlertTitle>Accès à la caméra requis</AlertTitle>
+                <AlertDescription>
+                  Veuillez autoriser l'accès à la caméra pour utiliser cette fonctionnalité.
+                </AlertDescription>
+              </Alert>
+            </div>
           )}
         </div>
       </DialogContent>
