@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { MapPin, Barcode, Package, Calendar, Save } from "lucide-react";
+import { MapPin, Barcode, Package, Calendar, Save, Camera } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import type { Product } from "@/lib/types";
+import { BarcodeScannerDialog } from "./barcode-scanner-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   address: z.string().min(1, "Adresse est requise."),
@@ -36,6 +39,8 @@ type InventoryFormProps = {
 };
 
 export function InventoryForm({ onAddProduct }: InventoryFormProps) {
+  const { toast } = useToast();
+  const [isScannerOpen, setScannerOpen] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -51,70 +56,40 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
     form.reset();
   }
 
+  const handleBarcodeScan = (result: string | null) => {
+    if (result) {
+      form.setValue("barcode", result);
+      toast({
+        title: "Code barre scanné",
+        description: `Code barre: ${result}`,
+      });
+    }
+    setScannerOpen(false);
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ajouter un produit</CardTitle>
-        <CardDescription>
-          Remplissez les informations du produit à ajouter à l'inventaire.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Adresse</FormLabel>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <FormControl>
-                      <Input
-                        placeholder="Ex: Allée 5, Étagère 2"
-                        {...field}
-                        className="pl-10"
-                      />
-                    </FormControl>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="barcode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code barre</FormLabel>
-                  <div className="relative">
-                    <Barcode className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <FormControl>
-                      <Input
-                        placeholder="Scanner ou entrer le code barre"
-                        {...field}
-                        className="pl-10"
-                      />
-                    </FormControl>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Ajouter un produit</CardTitle>
+          <CardDescription>
+            Remplissez les informations du produit à ajouter à l'inventaire.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="quantity"
+                name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantité</FormLabel>
+                    <FormLabel>Adresse</FormLabel>
                     <div className="relative">
-                      <Package className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <FormControl>
                         <Input
-                          type="number"
-                          placeholder="0"
+                          placeholder="Ex: Allée 5, Étagère 2"
                           {...field}
                           className="pl-10"
                         />
@@ -126,29 +101,87 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
               />
               <FormField
                 control={form.control}
-                name="expirationDate"
+                name="barcode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date d'expiration</FormLabel>
+                    <FormLabel>Code barre</FormLabel>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Barcode className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <FormControl>
-                        <Input type="date" {...field} className="pl-10" />
+                        <Input
+                          placeholder="Scanner ou entrer le code barre"
+                          {...field}
+                          className="pl-10 pr-12"
+                        />
                       </FormControl>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setScannerOpen(true)}
+                      >
+                        <Camera className="h-4 w-4" />
+                        <span className="sr-only">Scanner un code-barres</span>
+                      </Button>
                     </div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantité</FormLabel>
+                      <div className="relative">
+                        <Package className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            {...field}
+                            className="pl-10"
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="expirationDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date d'expiration</FormLabel>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <FormControl>
+                          <Input type="date" {...field} className="pl-10" />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <Button type="submit" className="w-full !mt-6">
-              <Save className="mr-2 h-4 w-4" />
-              Enregistrer
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+              <Button type="submit" className="w-full !mt-6">
+                <Save className="mr-2 h-4 w-4" />
+                Enregistrer
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      <BarcodeScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setScannerOpen}
+        onScan={handleBarcodeScan}
+      />
+    </>
   );
 }
