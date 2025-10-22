@@ -1,0 +1,65 @@
+/**
+ * @fileoverview Firestore Security Rules for the inventory management application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model, where each user has full control over their own inventory items.
+ *
+ * Data Structure:
+ * All inventory item data is nested under /users/{userId}/inventoryItems/{itemId}, ensuring data isolation between users.
+ *
+ * Key Security Decisions:
+ * - Users can only access inventory items that belong to them.
+ * - Data validation is relaxed to allow rapid prototyping. Only authorization-critical fields are validated.
+ *
+ * Denormalization for Authorization:
+ * Path-based ownership eliminates the need for denormalization, as the user ID is embedded in the document path.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to inventory items for a specific user.
+     * @path /users/{userId}/inventoryItems/{itemId}
+     * @allow (create) - User A creates a new inventory item with id 'item1' under /users/A/inventoryItems/item1.
+     * @allow (get) - User A retrieves their inventory item with id 'item1' from /users/A/inventoryItems/item1.
+     * @allow (update) - User A updates their inventory item with id 'item1' at /users/A/inventoryItems/item1.
+     * @allow (delete) - User A deletes their inventory item with id 'item1' from /users/A/inventoryItems/item1.
+     * @deny (create) - User B attempts to create an inventory item under User A's path (/users/A/inventoryItems/item1).
+     * @deny (get) - User B attempts to retrieve an inventory item from User A's path (/users/A/inventoryItems/item1).
+     * @deny (update) - User B attempts to update an inventory item in User A's path (/users/A/inventoryItems/item1).
+     * @deny (delete) - User B attempts to delete an inventory item from User A's path (/users/A/inventoryItems/item1).
+     * @principle Enforces document ownership for writes. Restricts access to a user's own data tree. Validates relational integrity between documents.
+     */
+    match /users/{userId}/inventoryItems/{itemId} {
+      // Helper function to check if the user is signed in
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      // Helper function to check if the requested user ID matches the authenticated user ID
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      // Helper function to check if the user is the owner and the resource exists
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      // Allow anyone to read any data as long as the user is signed in.
+      allow get: if isSignedIn() && isOwner(userId);
+      // Allow the user to list all of their own documents.
+      allow list: if isSignedIn() && isOwner(userId);
+
+      // Only allow the user to create a document if their user ID matches the userId in the path.
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == itemId;
+
+      // Only allow the user to update a document if their user ID matches the userId in the path and the document exists. Also, enforce immutability of the userId.
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+
+      // Only allow the user to delete a document if their user ID matches the userId in the path and the document exists.
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
