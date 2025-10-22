@@ -17,8 +17,10 @@ import {
   useUser,
   useMemoFirebase,
   addDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+  setDocumentNonBlocking
 } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, writeBatch, getDocs } from "firebase/firestore";
 import type { Alert } from "@/lib/types";
 
 export default function InventoryPage({ params }: { params: Promise<{ storeId: string; aisleId: string }> }) {
@@ -63,6 +65,33 @@ export default function InventoryPage({ params }: { params: Promise<{ storeId: s
         });
     }
   };
+  
+  const updateProduct = (product: Product) => {
+    if (user) {
+        const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products", product.id);
+        const { id, ...productData } = product;
+        setDocumentNonBlocking(docRef, productData, { merge: true });
+    }
+  };
+
+  const deleteProduct = (productId: string) => {
+    if (user) {
+        const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products", productId);
+        deleteDocumentNonBlocking(docRef);
+    }
+  };
+  
+  const deleteAllProducts = async () => {
+    if (user && productsQuery) {
+        const querySnapshot = await getDocs(productsQuery);
+        const batch = writeBatch(firestore);
+        querySnapshot.forEach((doc) => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+    }
+  };
+
 
   const handleAnalysis = async () => {
     if (!products || products.length === 0) {
@@ -113,7 +142,13 @@ export default function InventoryPage({ params }: { params: Promise<{ storeId: s
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <InventoryForm onAddProduct={addProduct} />
-            <InventoryList products={products || []} isLoading={areProductsLoading} />
+            <InventoryList
+              products={products || []}
+              isLoading={areProductsLoading}
+              onUpdateProduct={updateProduct}
+              onDeleteProduct={deleteProduct}
+              onDeleteAllProducts={deleteAllProducts}
+            />
           </div>
           <div className="lg:col-span-1">
             <ExpirationAlerts
