@@ -8,11 +8,21 @@ import {
 import type { Product } from "@/lib/types";
 import * as XLSX from "xlsx";
 
+function formatToISODate(dateStr: string): string {
+    if (!/^\d{8}$/.test(dateStr)) {
+      return dateStr; // Return original if not in expected format
+    }
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    return `${year}-${month}-${day}`;
+}
+
 export async function runExpirationAnalysis(products: Product[]) {
   const input: AnalyzeExpirationDatesInput = {
     products: products.map((p) => ({
       barcode: p.barcode,
-      expirationDate: p.expirationDate,
+      expirationDate: formatToISODate(p.expirationDate),
       quantity: p.quantity,
     })),
     businessRules:
@@ -65,3 +75,4 @@ export async function exportToExcel(products: (Product & { storeName?: string; a
     const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     return Buffer.from(buf).toString('base64');
 }
+
