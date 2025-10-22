@@ -52,7 +52,7 @@ const initialProducts: Product[] = [
 
 export default function InventoryPage({ params }: { params: { storeId: string, aisleId: string } }) {
   const { toast } = useToast();
-  const [products, setProducts] = useState<Product[]>(
+  const [products, setProducts] = useState<Product[]>(() => 
     initialProducts.filter(p => p.storeId === params.storeId && p.aisleId === params.aisleId)
   );
   const [alerts, setAlerts] = useState<Alert[]>([]);
