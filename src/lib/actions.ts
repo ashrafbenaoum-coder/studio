@@ -28,19 +28,40 @@ export async function runExpirationAnalysis(products: Product[]) {
   }
 }
 
-export async function exportToExcel(products: Product[]) {
-    const dataToExport = products.map((product) => ({
-      "Code Barre": product.barcode,
-      Adresse: product.address,
-      Quantité: product.quantity,
-      "Date d'expiration": product.expirationDate,
-    }));
+export async function exportToExcel(products: (Product & { storeName?: string; aisleName?: string })[]) {
+    const dataToExport = products.map((product) => {
+      const record: any = {
+        "Code Barre": product.barcode,
+        Adresse: product.address,
+        Quantité: product.quantity,
+        "Date d'expiration": product.expirationDate,
+      };
+      if (product.storeName) {
+        record["Nom du Magasin"] = product.storeName;
+      }
+      if (product.aisleName) {
+        record["Nom du Rayon"] = product.aisleName;
+      }
+      return record;
+    });
+    
+    // Reorder keys to ensure Magasin and Rayon are first if they exist
+    const orderedData = dataToExport.map(item => {
+        const orderedItem: any = {};
+        if (item["Nom du Magasin"]) orderedItem["Nom du Magasin"] = item["Nom du Magasin"];
+        if (item["Nom du Rayon"]) orderedItem["Nom du Rayon"] = item["Nom du Rayon"];
+        for (const key in item) {
+            if (key !== "Nom du Magasin" && key !== "Nom du Rayon") {
+                orderedItem[key] = item[key];
+            }
+        }
+        return orderedItem;
+    });
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const worksheet = XLSX.utils.json_to_sheet(orderedData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Inventaire");
     
-    // This part is tricky on the server. We'll return the data and handle download on client.
     const buf = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
     return Buffer.from(buf).toString('base64');
 }
