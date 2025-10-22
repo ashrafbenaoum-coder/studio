@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, use } from "react";
 import { runExpirationAnalysis } from "@/lib/actions";
 import type { Product, Store, Aisle } from "@/lib/types";
 import { InventoryForm } from "@/components/dashboard/inventory-form";
@@ -21,8 +21,8 @@ import {
 import { collection, doc } from "firebase/firestore";
 import type { Alert } from "@/lib/types";
 
-export default function InventoryPage({ params }: { params: { storeId: string; aisleId: string } }) {
-  const { storeId, aisleId } = params;
+export default function InventoryPage({ params }: { params: Promise<{ storeId: string; aisleId: string }> }) {
+  const { storeId, aisleId } = use(params);
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
