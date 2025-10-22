@@ -70,7 +70,7 @@ export function LoginForm() {
           Se connecter
         </CardTitle>
         <CardDescription className="text-center">
-          The registration field is not available.
+          Accédez à votre tableau de bord de gestion des stocks.
         </CardDescription>
       </CardHeader>
       <CardContent>
