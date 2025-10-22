@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
@@ -48,7 +49,7 @@ export default function InventoryPage({ params }: { params: { storeId: string; a
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isPending, startTransition] = useTransition();
 
-  const addProduct = (product: Omit<Product, "id">) => {
+  const addProduct = (product: Omit<Product, "id" | "storeId" | "aisleId" >) => {
     if (productsQuery) {
         const newProduct = { 
             ...product, 

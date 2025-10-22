@@ -39,7 +39,7 @@ const formSchema = z.object({
 });
 
 type InventoryFormProps = {
-  onAddProduct: (product: Omit<Product, "id">) => void;
+  onAddProduct: (product: Omit<Product, "id" | "storeId" | "aisleId">) => void;
 };
 
 export function InventoryForm({ onAddProduct }: InventoryFormProps) {
@@ -56,9 +56,7 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    onAddProduct({
-      ...values,
-    });
+    onAddProduct(values);
     form.reset();
   }
 
