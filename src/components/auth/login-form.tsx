@@ -2,12 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  initiateEmailSignIn,
-  initiateEmailSignUp,
-  useAuth,
-  useUser,
-} from "@/firebase";
+import { useAuth, useUser } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,17 +11,46 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useEffect } from "react";
-import { Auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
+const formSchema = z.object({
+  username: z.string().min(1, "Nom d'utilisateur est requis."),
+  password: z.string().min(1, "Mot de passe est requis."),
+});
 
-const hardcodedEmail = "gds@gds.com";
-const hardcodedPassword = "gdsidl";
+const hardcodedFirebaseEmail = "gds@gds.com";
+const hardcodedFirebasePassword = "gdsidl";
+const requiredUsername = "GDS";
+const requiredPassword = "gdsidl";
 
 export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
+  const { toast } = useToast();
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -34,26 +58,30 @@ export function LoginForm() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleLoginOrSignUp = async (authInstance: Auth, email: string, password: string) => {
+  const handleLogin = async (values: z.infer<typeof formSchema>) => {
+    setLoginError(null);
+    if (values.username !== requiredUsername || values.password !== requiredPassword) {
+      setLoginError("Nom d'utilisateur ou mot de passe incorrect.");
+      return;
+    }
+
     try {
-      // First, try to sign in
-      await signInWithEmailAndPassword(authInstance, email, password);
-    } catch (signInError: any) {
-      // If sign-in fails because the user doesn't exist, try to sign them up.
-      if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
-        try {
-          await createUserWithEmailAndPassword(authInstance, email, password);
-        } catch (signUpError) {
-          // Handle sign-up errors (e.g., weak password)
-          console.error("Sign-up failed after sign-in attempt failed:", signUpError);
-        }
+      await signInWithEmailAndPassword(auth, hardcodedFirebaseEmail, hardcodedFirebasePassword);
+    } catch (error: any) {
+      console.error("Firebase sign-in error:", error);
+      // This might happen if the user was deleted from Firebase console
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+         setLoginError("Le compte principal n'existe pas. Veuillez contacter le support.");
       } else {
-        // Handle other sign-in errors (e.g., wrong password)
-        console.error("Sign-in failed:", signInError);
+        setLoginError("Une erreur de connexion s'est produite.");
       }
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: "Une erreur s'est produite lors de la connexion. Veuillez réessayer.",
+      });
     }
   };
-  
 
   if (isUserLoading || user) {
     return (
@@ -74,11 +102,42 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <Button onClick={() => handleLoginOrSignUp(auth, hardcodedEmail, hardcodedPassword)} className="w-full">
-            Se connecter
-          </Button>
-        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nom d'utilisateur</FormLabel>
+                  <FormControl>
+                    <Input placeholder="GDS" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mot de passe</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {loginError && (
+                <p className="text-sm font-medium text-destructive">{loginError}</p>
+            )}
+            <Button type="submit" className="w-full !mt-6">
+              Se connecter
+            </Button>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );
