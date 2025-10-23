@@ -17,13 +17,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
-import { useAuth, useUser, useFirestore } from "@/firebase";
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sun, Moon, Monitor, LogOut, FileDown, Users, Loader2, KeyRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { collection, getDocs, doc } from "firebase/firestore";
-import type { Store, Aisle, Product } from "@/lib/types";
+import type { Store, Aisle, Product, UserProfile } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/actions";
 import { saveAs } from "file-saver";
@@ -41,24 +41,22 @@ export default function DashboardLayout({
   const { setTheme } = useTheme();
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
-  const [isAdmin, setIsAdmin] = useState(false);
+  
+  const userDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, "users", user.uid) : null),
+    [firestore, user]
+  );
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+
+  const isAdmin = useMemo(() => userProfile?.role === "Administrator", [userProfile]);
+  const isLoading = isUserLoading || isProfileLoading;
+
 
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.replace("/");
     }
   }, [user, isUserLoading, router]);
-
-  useEffect(() => {
-    if (user) {
-      user.getIdTokenResult(true).then((idTokenResult) => {
-        const role = (idTokenResult.claims.role as string) || "Viewer";
-        setIsAdmin(role === "Administrator");
-      });
-    } else {
-        setIsAdmin(false);
-    }
-  }, [user]);
 
   const handleLogout = () => {
     auth.signOut();
@@ -133,7 +131,7 @@ export default function DashboardLayout({
   };
 
 
-  if (isUserLoading || !user) {
+  if (isLoading || !user) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card/80 px-4 backdrop-blur md:px-6">
@@ -184,9 +182,9 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || !isAdmin || isUserLoading}>
-                  {isExporting || isUserLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  <span>{isExporting ? "Exportation..." : (isUserLoading ? "Vérification..." : "Exporter les fichiers")}</span>
+                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || isLoading || !isAdmin}>
+                  {isExporting || isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                  <span>{isExporting ? "Exportation..." : (isLoading ? "Vérification..." : "Exporter les fichiers")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
@@ -212,7 +210,7 @@ export default function DashboardLayout({
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
                 <DropdownMenuItem asChild>
-                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin || isUserLoading ? "pointer-events-none text-muted-foreground" : ""}>
+                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin || isLoading ? "pointer-events-none text-muted-foreground" : ""}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
                   </Link>
