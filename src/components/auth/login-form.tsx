@@ -27,6 +27,7 @@ import * as z from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   login: z.string().min(1, "Utilisateur est requis."),
