@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
 import {
   Dialog,
@@ -26,45 +26,46 @@ export function BarcodeScannerDialog({
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
-  const codeReader = useRef<BrowserMultiFormatReader | null>(null);
+  const codeReader = useRef<BrowserMultiFormatReader>(new BrowserMultiFormatReader());
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
+
+  const stopScanner = useCallback(() => {
+    if (controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
-    if (!codeReader.current) {
-      codeReader.current = new BrowserMultiFormatReader();
-    }
-
-    let activeStream: MediaStream | null = null;
-    const reader = codeReader.current;
-
     const startScanner = async () => {
-      if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
-
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !videoRef.current) {
+        return;
+      }
+      
       try {
-        // Ask for camera permission
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+          video: { facingMode: 'environment' },
         });
+        
         setHasCameraPermission(true);
-        activeStream = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-
-          // reset any previous decoding
-          reader.reset();
-
-          // decodeOnceFromVideoDevice is more stable than decodeFromStream
-          await reader.decodeOnceFromVideoDevice(undefined, videoRef.current).then(result => {
+        videoRef.current.srcObject = stream;
+        
+        // Use decodeContinuously for better performance and responsiveness
+        controlsRef.current = await codeReader.current.decodeContinuously(
+          videoRef.current,
+          (result, error) => {
             if (result) {
+              // Once a result is found, stop the scanner and call the onScan callback
+              stopScanner();
               onScan(result.getText());
-              setTimeout(() => onOpenChange(false), 500);
+              setTimeout(() => onOpenChange(false), 300);
             }
-          }).catch(error => {
+            
             if (error && !(error instanceof NotFoundException)) {
               console.error("Barcode decoding error:", error);
             }
-          });
-        }
+          }
+        );
       } catch (error: any) {
         console.error("Camera access error:", error);
         setHasCameraPermission(false);
@@ -82,23 +83,7 @@ export function BarcodeScannerDialog({
             description: "Impossible d'accéder à la caméra. Vérifiez les permissions ou réessayez.",
           });
         }
-
         setTimeout(() => onOpenChange(false), 500);
-      }
-    };
-
-    const stopScanner = () => {
-      try {
-        if (reader) reader.reset();
-        if (activeStream) {
-          activeStream.getTracks().forEach((track) => track.stop());
-          activeStream = null;
-        }
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-      } catch (err) {
-        console.warn("Error stopping scanner:", err);
       }
     };
 
@@ -108,11 +93,11 @@ export function BarcodeScannerDialog({
       stopScanner();
     }
 
-    // Cleanup when dialog closes or component unmounts
+    // Cleanup function when the component unmounts or the dialog is closed
     return () => {
       stopScanner();
     };
-  }, [open, onScan, onOpenChange, toast]);
+  }, [open, onScan, onOpenChange, toast, stopScanner]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,6 +117,7 @@ export function BarcodeScannerDialog({
             muted
             playsInline
           />
+          {/* Optional: Add a scanning line/reticle overlay here for better UX */}
           {hasCameraPermission === false && (
             <div className="absolute inset-0 flex items-center justify-center p-4">
               <Alert variant="destructive">
