@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -75,19 +76,15 @@ export function LoginForm() {
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, gdsEmail, values.password);
                     const userDocRef = doc(firestore, "users", userCredential.user.uid);
+                    // NOTE: The role is set via custom claims in the Firebase Console, not here.
                     await setDoc(userDocRef, {
                         email: userCredential.user.email,
-                        role: "Administrator",
                         displayName: "GDS Admin"
                     });
                     
-                    // Also create the login mapping for legacy purposes if needed, or just for consistency
-                    const loginRef = doc(firestore, "logins", "gds");
-                    await setDoc(loginRef, { email: gdsEmail });
-
                     toast({
                         title: "Compte Administrateur Créé",
-                        description: "Le compte 'gds' a été initialisé avec succès.",
+                        description: "Le compte 'gds@gds.com' a été créé. Veuillez définir son rôle sur 'Administrator' dans la console Firebase.",
                     });
                 } catch (creationError: any) {
                    toast({

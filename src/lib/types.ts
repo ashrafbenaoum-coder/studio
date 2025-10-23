@@ -25,7 +25,7 @@ export interface Product {
 export interface UserProfile {
     id: string;
     email: string;
-    role: "Administrator" | "Viewer";
+    role?: "Administrator" | "Viewer";
     displayName?: string;
 }
 
