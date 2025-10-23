@@ -25,7 +25,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
+import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   login: z.string().min(1, "Login est requis."),
@@ -37,7 +38,7 @@ export function LoginForm() {
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,10 +55,10 @@ export function LoginForm() {
   }, [user, isUserLoading, router]);
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
-    setLoginError(null);
+    setIsSubmitting(true);
     try {
       const firestore = getFirestore(auth.app);
-      const loginRef = doc(firestore, "logins", values.login); // 🔐 login → email
+      const loginRef = doc(firestore, "logins", values.login);
       const loginDoc = await getDoc(loginRef);
 
       if (!loginDoc.exists()) {
@@ -65,43 +66,27 @@ export function LoginForm() {
       }
 
       const email = loginDoc.data().email;
-      const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
-      const loggedInUser = userCredential.user;
-
-      // ✅ Initialiser le rôle admin si login est "gds"
-      if (loggedInUser && values.login.toLowerCase() === "gds") {
-        const userDocRef = doc(firestore, "users", loggedInUser.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
-            email: loggedInUser.email,
-            role: "Administrator",
-          });
-          toast({
-            title: "Compte Administrateur Initialisé",
-            description: "Le rôle d'administrateur a été assigné à 'gds'.",
-          });
-        }
-      }
+      await signInWithEmailAndPassword(auth, email, values.password);
       
       toast({
         title: "Connexion réussie",
         description: `Bienvenue ${values.login}`,
       });
+      // The useEffect will handle the redirect
 
     } catch (error: any) {
       const message =
         error.code === "auth/wrong-password" || error.message === "login-not-found"
           ? "Login ou mot de passe incorrect."
           : "Une erreur de connexion s'est produite.";
-
-      setLoginError(message);
+      
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
         description: message,
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,7 +129,7 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Mot de passe</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
@@ -152,11 +137,9 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            {loginError && (
-              <p className="text-sm font-medium text-destructive">{loginError}</p>
-            )}
-            <Button type="submit" className="w-full !mt-6">
-              Se connecter
+            <Button type="submit" className="w-full !mt-6" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Connexion..." : "Se connecter"}
             </Button>
           </form>
         </Form>
