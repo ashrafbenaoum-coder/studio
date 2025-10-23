@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -44,12 +44,11 @@ import {
   useFirestore,
   useUser,
   useMemoFirebase,
-  useDoc,
-  useCollection,
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
+  useDoc
 } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, getDocs } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
 export function UsersDashboard() {
@@ -64,17 +63,43 @@ export function UsersDashboard() {
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = useMemo(() => adminProfile?.role === "Administrator", [adminProfile]);
 
-  const usersQuery = useMemoFirebase(
-    () => (isAdmin ? collection(firestore, "users") : null),
-    [firestore, isAdmin]
-  );
-  const { data: users, isLoading: areUsersLoading } = useCollection<UserProfile>(usersQuery);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [areUsersLoading, setUsersLoading] = useState(true);
 
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     role: "Viewer" as "Administrator" | "Viewer",
   });
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (isAdmin && firestore) {
+        setUsersLoading(true);
+        const usersCollectionRef = collection(firestore, "users");
+        try {
+          const querySnapshot = await getDocs(usersCollectionRef);
+          const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+          setUsers(usersList);
+        } catch (error) {
+          console.error("Error fetching users:", error);
+          toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Impossible de charger la liste des utilisateurs.",
+          });
+        } finally {
+          setUsersLoading(false);
+        }
+      } else if (adminProfile) {
+        // Not an admin or firestore not ready, stop loading.
+        setUsersLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [isAdmin, firestore, adminProfile, toast]);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -86,7 +111,7 @@ export function UsersDashboard() {
   };
 
   const handleCreateUser = () => {
-    if (!usersQuery || !newUserData.email) {
+    if (!newUserData.email) {
         toast({
             variant: "destructive",
             title: "Erreur",
@@ -94,18 +119,20 @@ export function UsersDashboard() {
         });
         return;
     }
-    
-    // This function now adds user data to Firestore, but authentication must be handled in the Firebase Console.
-    addDocumentNonBlocking(usersQuery, {
+    const usersCollectionRef = collection(firestore, "users");
+    // This adds user data to Firestore, but authentication must be handled in the Firebase Console.
+    addDocumentNonBlocking(usersCollectionRef, {
       email: newUserData.email,
       role: newUserData.role,
     });
     
     toast({
-      title: "Utilisateur ajouté à la base de données",
+      title: "Profil créé dans la base de données",
       description: `N'oubliez pas de créer un compte d'authentification pour ${newUserData.email} dans la console Firebase.`,
     });
-
+    
+    // Optimistically update the UI
+    setUsers(prevUsers => [...prevUsers, { id: 'temp-' + Date.now(), ...newUserData }]);
     setAddUserDialogOpen(false);
     setNewUserData({ email: "", role: "Viewer" });
   };
@@ -117,9 +144,11 @@ export function UsersDashboard() {
     }
     const docRef = doc(firestore, "users", userId);
     deleteDocumentNonBlocking(docRef);
+    
+    // Optimistically update the UI
+    setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     toast({ title: "Utilisateur supprimé", description: "L'enregistrement de l'utilisateur a été supprimé de Firestore." });
   };
-
 
   if (!isAdmin) {
     return (
@@ -141,8 +170,7 @@ export function UsersDashboard() {
           <div>
             <CardTitle>Gérer les utilisateurs</CardTitle>
             <CardDescription>
-              Ajoutez des profils d'utilisateurs ici, puis créez leurs comptes
-              dans la console Firebase.
+              Ajoutez des profils ici, puis créez leurs comptes d'authentification dans la console Firebase.
             </CardDescription>
           </div>
           <Dialog
@@ -258,5 +286,3 @@ export function UsersDashboard() {
     </div>
   );
 }
-
-    
