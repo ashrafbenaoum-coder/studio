@@ -23,9 +23,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -58,25 +58,58 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       const firestore = getFirestore(auth.app);
-      const loginRef = doc(firestore, "logins", values.login);
+      const loginRef = doc(firestore, "logins", values.login.toLowerCase());
       const loginDoc = await getDoc(loginRef);
+      let email;
 
       if (!loginDoc.exists()) {
-        throw new Error("login-not-found");
+        // Cas spécial pour l'admin "gds" : on le crée s'il n'existe pas
+        if (values.login.toLowerCase() === "gds") {
+          email = "gds@gds.com";
+          try {
+            // Tenter de créer l'utilisateur
+            const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
+            
+            // Créer le document de login et le profil utilisateur
+            await setDoc(loginRef, { email: email });
+            const userDocRef = doc(firestore, "users", userCredential.user.uid);
+            await setDoc(userDocRef, {
+              email: userCredential.user.email,
+              role: "Administrator",
+              displayName: "GDS Admin"
+            });
+            toast({
+              title: "Compte Administrateur Créé",
+              description: "Le compte 'gds' a été initialisé avec succès.",
+            });
+             // La connexion est déjà faite par createUserWithEmailAndPassword, on peut sortir
+             setIsSubmitting(false);
+             return;
+          } catch (error: any) {
+            // Si l'utilisateur existe déjà, on tente de se connecter
+            if (error.code === 'auth/email-already-in-use') {
+              // L'utilisateur existe, on continue pour tenter la connexion normale
+            } else {
+              throw error; // Lancer une autre erreur
+            }
+          }
+        } else {
+          throw new Error("login-not-found");
+        }
       }
-
-      const email = loginDoc.data().email;
+      
+      // Si on arrive ici, soit le login existe, soit c'est l'admin qui existait déjà
+      email = loginDoc.exists() ? loginDoc.data().email : "gds@gds.com";
       await signInWithEmailAndPassword(auth, email, values.password);
       
       toast({
         title: "Connexion réussie",
         description: `Bienvenue ${values.login}`,
       });
-      // The useEffect will handle the redirect
 
     } catch (error: any) {
       const message =
-        error.code === "auth/wrong-password" || error.message === "login-not-found"
+        error.code === "auth/wrong-password" || error.code === "auth/invalid-credential" || error.message === "login-not-found"
           ? "Login ou mot de passe incorrect."
           : "Une erreur de connexion s'est produite.";
       
