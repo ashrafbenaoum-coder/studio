@@ -59,20 +59,15 @@ import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFi
 import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
-// NOTE: This component is for presentation and state management on the client-side.
-// Real user creation/deletion requires Firebase Admin SDK on a secure server environment,
-// which is not implemented here. This component simulates the UI/UX for such features.
 
 export function UsersDashboard() {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const { user: adminUser } = useUser(); // The currently logged-in admin
+  const { user: adminUser } = useUser();
   
-  // Fetch all user profiles from Firestore
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, "users"), [firestore]);
   const { data: userProfiles, isLoading: areUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
-  // Fetch the current admin's profile to check their role
   const adminProfileRef = useMemoFirebase(() => adminUser ? doc(firestore, 'users', adminUser.uid) : null, [adminUser, firestore]);
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = adminProfile?.role === 'Administrator';
@@ -95,8 +90,6 @@ export function UsersDashboard() {
   };
 
   const handleCreateUser = () => {
-    // In a real app, this would trigger a server-side function to create the user in Firebase Auth.
-    // For now, it's a simulation.
     toast({
       title: "Création (Simulation)",
       description: `Dans une application réelle, l'utilisateur ${newUserData.email} serait créé.`,
@@ -107,7 +100,6 @@ export function UsersDashboard() {
   };
   
   const openDeleteConfirm = (user: UserProfile) => {
-    // Prevent admin from deleting their own account from the UI
     if (adminUser?.uid === user.id) {
         toast({
             variant: "destructive",
@@ -121,9 +113,6 @@ export function UsersDashboard() {
   
   const handleDeleteUser = () => {
     if (userToDelete) {
-      // In a real app, this would trigger a server-side function (e.g., Cloud Function)
-      // to delete the user from Firebase Auth and their data from Firestore.
-      // Here, we only show a toast as it's a simulation.
       toast({
         title: "Suppression (Simulation)",
         description: `Dans une application réelle, l'utilisateur ${userToDelete.email} serait supprimé.`,
@@ -146,12 +135,16 @@ export function UsersDashboard() {
     
     toast({
       title: "Rôle mis à jour",
-      description: `Le rôle de l'utilisateur ${userToEdit.email} a été défini sur ${userToEdit.role}.`,
+      description: `Le rôle de l'utilisateur ${userToEdit.email.split('@')[0]} a été défini sur ${userToEdit.role}.`,
     });
 
     setEditUserDialogOpen(false);
     setUserToEdit(null);
   };
+  
+  const formatUsername = (email: string) => {
+    return email.split('@')[0];
+  }
 
   return (
     <div className="space-y-6">
@@ -179,7 +172,7 @@ export function UsersDashboard() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                      <div className="space-y-2">
-                        <Label htmlFor="email">Logine</Label>
+                        <Label htmlFor="email">Utilisateur</Label>
                         <Input id="email" name="email" type="text" value={newUserData.email} onChange={handleInputChange} required />
                     </div>
                      <div className="space-y-2">
@@ -210,7 +203,7 @@ export function UsersDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Email</TableHead>
+                <TableHead>Utilisateur</TableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -229,7 +222,7 @@ export function UsersDashboard() {
               ) : (
                 userProfiles?.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.email}</TableCell>
+                    <TableCell className="font-medium">{formatUsername(user.email)}</TableCell>
                     <TableCell>{user.role}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -267,8 +260,8 @@ export function UsersDashboard() {
           {userToEdit && (
              <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input id="edit-email" name="email" type="text" value={userToEdit.email} disabled />
+                <Label htmlFor="edit-email">Utilisateur</Label>
+                <Input id="edit-email" name="email" type="text" value={formatUsername(userToEdit.email)} disabled />
               </div>
               <div className="space-y-2">
                   <Label htmlFor="edit-role">Rôle</Label>
@@ -297,7 +290,7 @@ export function UsersDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est une simulation. Dans une application réelle, elle supprimerait l'utilisateur "{userToDelete?.email}" de façon permanente.
+              Cette action est une simulation. Dans une application réelle, elle supprimerait l'utilisateur "{userToDelete ? formatUsername(userToDelete.email) : ''}" de façon permanente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -309,5 +302,3 @@ export function UsersDashboard() {
     </div>
   );
 }
-
-    

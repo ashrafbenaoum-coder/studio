@@ -28,7 +28,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
-  login: z.string().min(1, "Le login est requis."),
+  login: z.string().min(1, "L'utilisateur est requis."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -56,12 +56,13 @@ export function LoginForm() {
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
     try {
-      // Firebase auth still works with email and password, we just changed the UI field type
-      await signInWithEmailAndPassword(auth, values.login, values.password);
+      // Append a domain to the username to make it a valid email for Firebase Auth
+      const email = values.login.includes('@') ? values.login : `${values.login}@gds.com`;
+      await signInWithEmailAndPassword(auth, email, values.password);
     } catch (error: any) {
       console.error("Firebase sign-in error:", error);
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
-         setLoginError("Le login ou le mot de passe est incorrect.");
+         setLoginError("L'utilisateur ou le mot de passe est incorrect.");
       } else {
         setLoginError("Une erreur de connexion s'est produite.");
       }
@@ -99,7 +100,7 @@ export function LoginForm() {
               name="login"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Logine</FormLabel>
+                  <FormLabel>Utilisateur</FormLabel>
                   <FormControl>
                     <Input type="text" {...field} />
                   </FormControl>
