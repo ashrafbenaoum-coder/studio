@@ -90,7 +90,7 @@ export function UsersDashboard() {
               </DialogHeader>
               <form onSubmit={handleCreateUser} className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Adresse e-mail</Label>
+                  <Label htmlFor="email">Logine</Label>
                   <Input id="email" name="email" type="email" required />
                 </div>
                 <div className="space-y-2">
