@@ -29,7 +29,7 @@ import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  login: z.string().min(1, "Login est requis."),
+  email: z.string().email("L'adresse e-mail n'est pas valide."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -43,7 +43,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      login: "",
+      email: "",
       password: "",
     },
   });
@@ -57,64 +57,78 @@ export function LoginForm() {
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     const firestore = getFirestore(auth.app);
-    const loginUsername = values.login.toLowerCase();
-    const loginRef = doc(firestore, "logins", loginUsername);
-    const gdsEmail = "gds@gds.com";
+    const inputEmail = values.email.toLowerCase();
 
-    try {
-      let email;
+    // Special handling for the 'gds' admin account bootstrap
+    if (inputEmail === "gds") {
+        const gdsEmail = "gds@gds.com";
+        try {
+            // Try to sign in as gds@gds.com
+            await signInWithEmailAndPassword(auth, gdsEmail, values.password);
+            toast({
+                title: "Connexion réussie",
+                description: "Bienvenue Administrateur",
+            });
+        } catch (error: any) {
+            // If the gds user doesn't exist, create it
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, gdsEmail, values.password);
+                    const userDocRef = doc(firestore, "users", userCredential.user.uid);
+                    await setDoc(userDocRef, {
+                        email: userCredential.user.email,
+                        role: "Administrator",
+                        displayName: "GDS Admin"
+                    });
+                    
+                    // Also create the login mapping for legacy purposes if needed, or just for consistency
+                    const loginRef = doc(firestore, "logins", "gds");
+                    await setDoc(loginRef, { email: gdsEmail });
 
-      if (loginUsername === "gds") {
-        email = gdsEmail;
-      } else {
-        const loginDoc = await getDoc(loginRef);
-        if (!loginDoc.exists()) {
-          throw new Error("login-not-found");
+                    toast({
+                        title: "Compte Administrateur Créé",
+                        description: "Le compte 'gds' a été initialisé avec succès.",
+                    });
+                } catch (creationError: any) {
+                   toast({
+                    variant: "destructive",
+                    title: "Erreur de création",
+                    description: "Impossible de créer le compte administrateur.",
+                  });
+                }
+            } else {
+                // Other errors during sign-in (e.g., wrong password)
+                toast({
+                    variant: "destructive",
+                    title: "Erreur de connexion",
+                    description: "Login ou mot de passe incorrect pour l'admin.",
+                });
+            }
+        } finally {
+            setIsSubmitting(false);
         }
-        email = loginDoc.data().email;
-      }
-
-      await signInWithEmailAndPassword(auth, email, values.password);
+        return; // Stop execution for the special admin case
+    }
+    
+    // Standard user login
+    try {
+      await signInWithEmailAndPassword(auth, inputEmail, values.password);
       toast({
         title: "Connexion réussie",
-        description: `Bienvenue ${values.login}`,
+        description: `Bienvenue`,
       });
 
     } catch (error: any) {
-      if (loginUsername === "gds" && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
-        // L'utilisateur admin 'gds' n'existe pas, on le crée
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, gdsEmail, values.password);
-          await setDoc(loginRef, { email: gdsEmail });
-          const userDocRef = doc(firestore, "users", userCredential.user.uid);
-          await setDoc(userDocRef, {
-            email: userCredential.user.email,
-            role: "Administrator",
-            displayName: "GDS Admin"
-          });
-          toast({
-            title: "Compte Administrateur Créé",
-            description: "Le compte 'gds' a été initialisé avec succès.",
-          });
-        } catch (creationError: any) {
-           toast({
-            variant: "destructive",
-            title: "Erreur de création",
-            description: "Impossible de créer le compte administrateur.",
-          });
-        }
-      } else {
-         const message =
-          error.code === "auth/wrong-password" || error.message === "login-not-found"  || error.code === "auth/invalid-credential"
-            ? "Login ou mot de passe incorrect."
-            : "Une erreur de connexion s'est produite.";
-        
-        toast({
-          variant: "destructive",
-          title: "Erreur de connexion",
-          description: message,
-        });
-      }
+      const message =
+        error.code === "auth/wrong-password" || error.code === "auth/user-not-found" || error.code === "auth/invalid-credential"
+          ? "Email ou mot de passe incorrect."
+          : "Une erreur de connexion s'est produite.";
+      
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: message,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -143,12 +157,12 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
             <FormField
               control={form.control}
-              name="login"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Login</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} />
+                    <Input type="text" {...field} placeholder="email@exemple.com ou gds" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
