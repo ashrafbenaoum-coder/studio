@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -47,6 +48,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 
 interface User {
   id: string;
@@ -67,24 +76,27 @@ export function UsersDashboard() {
   const [isEditUserDialogOpen, setEditUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
+  const [editingUserRole, setEditingUserRole] = useState<string | undefined>(undefined);
+
 
   const handleCreateUser = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
+    const role = formData.get("role") as string;
     
     // Simulate creating a user
     const newUser: User = {
       id: (Math.random() * 10000).toString(),
       email,
-      role: "Viewer", // Default role
+      role: role || "Viewer", // Default role if not selected
     };
 
     setUsers(prevUsers => [...prevUsers, newUser]);
     
     toast({
       title: "Utilisateur créé (Simulation)",
-      description: `L'utilisateur ${email} a été ajouté avec succès.`,
+      description: `L'utilisateur ${email} a été ajouté avec le rôle ${newUser.role}.`,
     });
     setAddUserDialogOpen(false);
   };
@@ -106,6 +118,7 @@ export function UsersDashboard() {
   
   const openEditDialog = (user: User) => {
     setUserToEdit(user);
+    setEditingUserRole(user.role);
     setEditUserDialogOpen(true);
   };
 
@@ -116,7 +129,7 @@ export function UsersDashboard() {
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
 
-    setUsers(prevUsers => prevUsers.map(u => u.id === userToEdit.id ? { ...u, email } : u));
+    setUsers(prevUsers => prevUsers.map(u => u.id === userToEdit.id ? { ...u, email, role: editingUserRole || u.role } : u));
     
     toast({
       title: "Utilisateur modifié (Simulation)",
@@ -158,6 +171,18 @@ export function UsersDashboard() {
                 <div className="space-y-2">
                   <Label htmlFor="password">Mot de passe</Label>
                   <Input id="password" name="password" type="password" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Rôle</Label>
+                  <Select name="role" defaultValue="Viewer">
+                    <SelectTrigger id="role">
+                      <SelectValue placeholder="Sélectionner un rôle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Viewer">Viewer</SelectItem>
+                      <SelectItem value="Editor">Editor</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
@@ -223,7 +248,18 @@ export function UsersDashboard() {
                 <Label htmlFor="edit-email">Logine</Label>
                 <Input id="edit-email" name="email" type="text" defaultValue={userToEdit.email} required />
               </div>
-              {/* TODO: Add role editing here */}
+              <div className="space-y-2">
+                  <Label htmlFor="edit-role">Rôle</Label>
+                  <Select value={editingUserRole} onValueChange={setEditingUserRole}>
+                    <SelectTrigger id="edit-role">
+                      <SelectValue placeholder="Sélectionner un rôle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Viewer">Viewer</SelectItem>
+                      <SelectItem value="Editor">Editor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose>
                 <Button type="submit">Enregistrer</Button>
@@ -251,3 +287,5 @@ export function UsersDashboard() {
     </div>
   );
 }
+
+    
