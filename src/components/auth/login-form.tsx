@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -26,11 +25,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
+import { doc, getDoc, getFirestore } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  login: z.string().min(1, "Utilisateur est requis."),
+  login: z.string().min(1, "Login est requis."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -57,51 +56,29 @@ export function LoginForm() {
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
-    const firestore = getFirestore(auth.app);
-    let emailToLogin = values.login;
-
     try {
-        // If login does not contain '@', assume it's a custom login and fetch the email
-        if (!values.login.includes('@')) {
-            const loginDocRef = doc(firestore, "logins", values.login);
-            const loginDoc = await getDoc(loginDocRef);
+      const firestore = getFirestore(auth.app);
+      const loginRef = doc(firestore, "logins", values.login);
+      const loginDoc = await getDoc(loginRef);
 
-            if (loginDoc.exists()) {
-                emailToLogin = loginDoc.data().email;
-            } else {
-                throw new Error("Login not found");
-            }
-        }
-        
-        const userCredential = await signInWithEmailAndPassword(auth, emailToLogin, values.password);
-        const loggedInUser = userCredential.user;
+      if (!loginDoc.exists()) {
+        throw new Error("login-not-found");
+      }
 
-        // Special handling for initial 'gds' admin user setup
-        if (loggedInUser && values.login.toLowerCase() === "gds") {
-            const userDocRef = doc(firestore, "users", loggedInUser.uid);
-            const userDoc = await getDoc(userDocRef);
+      const email = loginDoc.data().email;
+      const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
+      const loggedInUser = userCredential.user;
 
-            if (!userDoc.exists()) {
-              await setDoc(userDocRef, {
-                email: loggedInUser.email,
-                role: "Administrator",
-              });
-              toast({
-                title: "Compte Administrateur Initialisé",
-                description: "Le rôle d'administrateur a été assigné à 'gds'.",
-              });
-            }
-        }
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue ${values.login}`,
+      });
 
     } catch (error: any) {
-      let message = "Utilisateur ou mot de passe incorrect.";
-      if (error.message === "Login not found") {
-        message = "Le nom d'utilisateur n'existe pas.";
-      } else if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
-        message = "Utilisateur ou mot de passe incorrect.";
-      } else {
-        message = "Une erreur de connexion s'est produite.";
-      }
+      const message =
+        error.code === "auth/wrong-password" || error.message === "login-not-found" || error.code === "auth/invalid-credential"
+          ? "Login ou mot de passe incorrect."
+          : "Une erreur de connexion s'est produite.";
 
       setLoginError(message);
       toast({
@@ -115,13 +92,14 @@ export function LoginForm() {
   if (isUserLoading || user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <p>Chargement...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-2 text-muted-foreground">Chargement...</p>
       </div>
     );
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader>
         <CardTitle className="text-center text-2xl font-headline">
           Se connecter
@@ -138,9 +116,9 @@ export function LoginForm() {
               name="login"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Utilisateur</FormLabel>
+                  <FormLabel>Login</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} />
+                    <Input type="text" placeholder="Nom d'utilisateur" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -153,7 +131,7 @@ export function LoginForm() {
                 <FormItem>
                   <FormLabel>Mot de passe</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input type="password" placeholder="********" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
