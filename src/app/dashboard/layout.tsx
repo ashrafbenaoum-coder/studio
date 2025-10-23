@@ -42,7 +42,15 @@ export default function DashboardLayout({
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
 
-  const isAdmin = useMemo(() => user?.email === "gds@gds.com", [user]);
+  // Assume user with this email has the 'Administrator' role for now.
+  const userRole = useMemo(() => {
+    if (user?.email === "gds@gds.com") {
+      return "Administrator";
+    }
+    return "Viewer"; // Default role
+  }, [user]);
+
+  const isAdmin = userRole === "Administrator";
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -174,7 +182,7 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting}>
+                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || !isAdmin}>
                   {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                   <span>{isExporting? "Exportation..." : "Exporter les fichiers"}</span>
                 </DropdownMenuItem>
@@ -202,7 +210,7 @@ export default function DashboardLayout({
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
                 <DropdownMenuItem asChild disabled={!isAdmin}>
-                  <Link href={isAdmin ? "/dashboard/users" : "#"}>
+                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin ? "pointer-events-none" : ""}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
                   </Link>
@@ -225,3 +233,5 @@ export default function DashboardLayout({
     </div>
   );
 }
+
+    
