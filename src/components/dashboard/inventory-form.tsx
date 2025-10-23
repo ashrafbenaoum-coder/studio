@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -36,25 +37,19 @@ const formSchema = z.object({
   expirationDate: z.string().regex(/^\d{8}$/, "La date doit être au format YYYYMMDD."),
 });
 
-type AisleConfig = { [key: string]: { pair: number; impair: number } };
+type AisleConfig = {
+  [key: string]: {
+    pairStart: string;
+    pairEnd: string;
+    impairStart: string;
+    impairEnd: string;
+  };
+};
 
-const generatePickingRange = (aisleName: string): { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; } | null => {
+const getAisleRanges = (aisleName: string): { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; } | null => {
     const config = (aisleConfig as AisleConfig)[aisleName];
     if (!config) return null;
-
-    const match = aisleName.match(/^([A-Z])(\d+)$/);
-    if (!match) return null;
-
-    const prefix = match[1];
-    const sectionNumber = parseInt(match[2], 10);
-    const section = sectionNumber.toString().padStart(3, '0');
-
-    return {
-        impairStart: `${prefix}-${section}-0001-00`,
-        impairEnd: `${prefix}-${section}-${config.impair.toString().padStart(4, '0')}-00`,
-        pairStart: `${prefix}-${section}-${config.pair.toString().padStart(4, '0')}-00`,
-        pairEnd: `${prefix}-${section}-0002-00`,
-    };
+    return config;
 };
 
 type InventoryFormProps = {
@@ -68,7 +63,7 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
 
   const getInitialAddress = (name?: string) => {
     if (!name) return "";
-    const range = generatePickingRange(name);
+    const range = getAisleRanges(name);
     return range ? range.impairStart : "";
   };
 
@@ -91,12 +86,12 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
     });
   }, [aisleName, form]);
 
-  function getNextAddress(current: string, rayonKey: string): string | null {
-    const range = generatePickingRange(rayonKey);
-    if (!range) return null;
-  
-    const parts = current.split('-');
-    if (parts.length !== 4) return null; 
+  function getNextAddress(currentAddress: string, aisleKey: string): string | null {
+    const ranges = getAisleRanges(aisleKey);
+    if (!ranges) return null;
+
+    const parts = currentAddress.split('-');
+    if (parts.length !== 4) return null;
 
     const prefix = parts[0];
     const section = parts[1];
@@ -105,12 +100,20 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
 
     if (isNaN(location)) return null;
 
-    if (location % 2 !== 0 ) { // Impair
-        if (current === range.impairEnd) return null;
+    const isImpair = location % 2 !== 0;
+
+    if (isImpair) {
+        if (currentAddress === ranges.impairEnd) {
+            // Reached end of impair side, switch to start of pair side
+            return ranges.pairStart;
+        }
         location += 2;
     } else { // Pair
-        if (current === range.pairEnd) return null;
-        location -= 2;
+        if (currentAddress === ranges.pairEnd) {
+            // Reached end of pair side, picking is finished for this aisle
+            return null;
+        }
+        location += 2; // Assuming pair side also increments. Adjust if it decrements.
     }
   
     return `${prefix}-${section}-${location.toString().padStart(4, "0")}-${level}`;
@@ -119,10 +122,10 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
   function onSubmit(values: z.infer<typeof formSchema>) {
     onAddProduct(values);
   
-    const rayonKey = aisleName;
+    const aisleKey = aisleName;
 
-    if (rayonKey) {
-      const nextAddress = getNextAddress(values.address, rayonKey);
+    if (aisleKey) {
+      const nextAddress = getNextAddress(values.address, aisleKey);
       if (nextAddress) {
         form.reset({
           ...values,
@@ -134,18 +137,25 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
       } else {
         toast({
           title: "Fin du rayon",
-          description: "Toutes les adresses de ce chemin ont été utilisées.",
+          description: `Toutes les adresses pour le rayon ${aisleKey} ont été parcourues.`,
         });
-        form.reset({ address: "", barcode: "", quantity: 0, expirationDate: ""});
+        // Optionally reset to the beginning of the aisle or clear the form
+        form.reset({
+          address: ranges ? ranges.impairStart : "",
+          barcode: "",
+          quantity: 0,
+          expirationDate: "",
+        });
       }
     } else {
         toast({
           variant: "destructive",
           title: "Rayon non configuré",
-          description: `La logique de picking pour le rayon ${rayonKey} n'est pas définie.`,
+          description: `La configuration pour le rayon ${aisleKey} n'est pas définie dans aisle-config.json.`,
         });
         form.reset({ address: "", barcode: "", quantity: 0, expirationDate: ""});
     }
+    const ranges = aisleKey ? getAisleRanges(aisleKey) : null;
   }
 
   const handleBarcodeScan = (result: string | null) => {
@@ -326,3 +336,4 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
     </>
   );
 }
+
