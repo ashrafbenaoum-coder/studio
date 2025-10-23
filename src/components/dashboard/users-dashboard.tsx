@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MoreVertical, Edit, Trash2 } from "lucide-react";
+import { MoreVertical, Edit, Trash2, UserPlus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -55,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
@@ -67,23 +67,70 @@ export function UsersDashboard() {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user: adminUser } = useUser(); // The currently logged-in admin
+  
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch all user profiles from Firestore
-  const usersCollectionRef = useMemoFirebase(() => collection(firestore, "users"), [firestore]);
-  const { data: userProfiles, isLoading } = useCollection<UserProfile>(usersCollectionRef);
+  // Fetch the current admin's profile to check their role
+  const adminProfileRef = useMemoFirebase(() => adminUser ? doc(firestore, 'users', adminUser.uid) : null, [adminUser, firestore]);
+  const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
+  const isAdmin = adminProfile?.role === 'Administrator';
 
+  // Fetch all user profiles from Firestore only if the user is an admin
+  const usersCollectionRef = useMemoFirebase(() => isAdmin ? collection(firestore, "users") : null, [isAdmin, firestore]);
+  const { data: allUsers, isLoading: areUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
+
+  useEffect(() => {
+    if (isAdmin) {
+      setIsLoading(areUsersLoading);
+      if(allUsers) {
+        setUserProfiles(allUsers);
+      }
+    } else {
+      // If not an admin, just show their own profile.
+      if (adminProfile) {
+        setUserProfiles([adminProfile]);
+      }
+      setIsLoading(false);
+    }
+  }, [adminProfile, allUsers, isAdmin, areUsersLoading]);
+
+
+  const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setEditUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [userToEdit, setUserToEdit] = useState<UserProfile | null>(null);
-  const [editingUserRole, setEditingUserRole] = useState<string | undefined>(undefined);
+  
+  const [newUserData, setNewUserData] = useState({ email: '', password: '', role: 'Viewer' as 'Administrator' | 'Viewer'});
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewUserData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleRoleChange = (value: 'Administrator' | 'Viewer') => {
+    setNewUserData(prev => ({ ...prev, role: value }));
+  };
+
+  const handleCreateUser = () => {
+    // In a real app, this would trigger a server-side function to create the user in Firebase Auth.
+    // For now, it's a simulation.
+    toast({
+      title: "Création (Simulation)",
+      description: `Dans une application réelle, l'utilisateur ${newUserData.email} serait créé.`,
+    });
+    console.log("Simulating creation of user:", newUserData);
+    setAddUserDialogOpen(false);
+    setNewUserData({ email: '', password: '', role: 'Viewer' });
+  };
+  
   const openDeleteConfirm = (user: UserProfile) => {
     // Prevent admin from deleting their own account from the UI
     if (adminUser?.uid === user.id) {
         toast({
             variant: "destructive",
             title: "Action non autorisée",
-            description: "Vous не pouvez pas supprimer votre propre compte.",
+            description: "Vous ne pouvez pas supprimer votre propre compte.",
         });
         return;
     }
@@ -106,19 +153,18 @@ export function UsersDashboard() {
   
   const openEditDialog = (user: UserProfile) => {
     setUserToEdit(user);
-    setEditingUserRole(user.role);
     setEditUserDialogOpen(true);
   };
 
   const handleUpdateUserRole = () => {
-    if (!userToEdit || !editingUserRole) return;
+    if (!userToEdit) return;
     
     const userDocRef = doc(firestore, "users", userToEdit.id);
-    setDocumentNonBlocking(userDocRef, { role: editingUserRole }, { merge: true });
+    setDocumentNonBlocking(userDocRef, { role: userToEdit.role }, { merge: true });
     
     toast({
       title: "Rôle mis à jour",
-      description: `Le rôle de l'utilisateur ${userToEdit.email} a été défini sur ${editingUserRole}.`,
+      description: `Le rôle de l'utilisateur ${userToEdit.email} a été défini sur ${userToEdit.role}.`,
     });
 
     setEditUserDialogOpen(false);
@@ -128,13 +174,55 @@ export function UsersDashboard() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <CardTitle>Gérer les utilisateurs</CardTitle>
             <CardDescription>
-              Affichez les utilisateurs et modifiez leurs rôles. Les utilisateurs sont créés via la console Firebase.
+             Créez des utilisateurs et modifiez leurs rôles. La suppression est une simulation.
             </CardDescription>
           </div>
+          <Dialog open={isAddUserDialogOpen} onOpenChange={setAddUserDialogOpen}>
+            <DialogTrigger asChild>
+                <Button>
+                    <UserPlus className="mr-2"/>
+                    Créer un utilisateur
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                 <DialogHeader>
+                    <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
+                    <DialogDescription>
+                        Entrez les informations pour créer un nouveau compte.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="email">Logine</Label>
+                        <Input id="email" name="email" type="text" value={newUserData.email} onChange={handleInputChange} required />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="password">Mot de passe</Label>
+                        <Input id="password" name="password" type="password" value={newUserData.password} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Rôle</Label>
+                      <Select value={newUserData.role} onValueChange={handleRoleChange}>
+                        <SelectTrigger id="role">
+                          <SelectValue placeholder="Sélectionner un rôle" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Viewer">Viewer</SelectItem>
+                          <SelectItem value="Administrator">Administrator</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose>
+                    <Button type="button" onClick={handleCreateUser}>Créer l'utilisateur</Button>
+                </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardHeader>
         <CardContent>
           <Table>
@@ -148,7 +236,13 @@ export function UsersDashboard() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center">Chargement des utilisateurs...</TableCell>
+                  <TableCell colSpan={3} className="h-24 text-center">
+                    <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : userProfiles.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground">Aucun utilisateur trouvé.</TableCell>
                 </TableRow>
               ) : (
                 userProfiles?.map((user) => (
@@ -158,7 +252,7 @@ export function UsersDashboard() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!isAdmin}>
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -192,11 +286,11 @@ export function UsersDashboard() {
              <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-email">Email</Label>
-                <Input id="edit-email" name="email" type="email" value={userToEdit.email} disabled />
+                <Input id="edit-email" name="email" type="text" value={userToEdit.email} disabled />
               </div>
               <div className="space-y-2">
                   <Label htmlFor="edit-role">Rôle</Label>
-                  <Select value={editingUserRole} onValueChange={setEditingUserRole}>
+                  <Select value={userToEdit.role} onValueChange={(value) => setUserToEdit(prev => prev ? {...prev, role: value as 'Administrator' | 'Viewer'} : null)}>
                     <SelectTrigger id="edit-role">
                       <SelectValue placeholder="Sélectionner un rôle" />
                     </SelectTrigger>
@@ -208,7 +302,7 @@ export function UsersDashboard() {
                 </div>
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose>
-                <Button type="button" onClick={handleUpdateUser}>Enregistrer</Button>
+                <Button type="button" onClick={handleUpdateUserRole}>Enregistrer</Button>
               </DialogFooter>
             </div>
           )}
