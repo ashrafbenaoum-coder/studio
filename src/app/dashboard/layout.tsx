@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,8 @@ export default function DashboardLayout({
   const { setTheme } = useTheme();
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
+
+  const isAdmin = useMemo(() => user?.email === "gds@gds.com", [user]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -199,7 +201,7 @@ export default function DashboardLayout({
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
-                <DropdownMenuItem disabled>
+                <DropdownMenuItem disabled={!isAdmin}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
                 </DropdownMenuItem>
