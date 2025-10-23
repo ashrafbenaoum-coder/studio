@@ -27,6 +27,7 @@ export function BarcodeScannerDialog({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
   const codeReader = useRef<BrowserMultiFormatReader | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (!codeReader.current) {
@@ -34,7 +35,6 @@ export function BarcodeScannerDialog({
     }
 
     const reader = codeReader.current;
-    let stream: MediaStream;
 
     const startScanner = async () => {
       if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
@@ -48,13 +48,14 @@ export function BarcodeScannerDialog({
             return;
         }
 
-        stream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: "environment",
             deviceId: videoInputDevices[0].deviceId
           },
         });
         setHasCameraPermission(true);
+        streamRef.current = stream;
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -92,8 +93,9 @@ export function BarcodeScannerDialog({
 
     const stopScanner = () => {
       reader.reset();
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
