@@ -114,7 +114,7 @@ export function UsersDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Adresse e-mail</TableHead>
+                <TableHead>Logine</TableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
