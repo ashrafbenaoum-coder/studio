@@ -29,4 +29,9 @@ export interface UserProfile {
     displayName?: string;
 }
 
+export interface Login {
+  email: string;
+}
+
+
 export type Alert = AnalyzeExpirationDatesOutput[0];

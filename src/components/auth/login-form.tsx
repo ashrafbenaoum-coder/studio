@@ -56,36 +56,51 @@ export function LoginForm() {
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
+    const firestore = getFirestore(auth.app);
+    let emailToLogin = values.login;
+
     try {
-      // Sanitize the login input to ensure it's always in the correct format.
-      const sanitizedLogin = values.login.split('@')[0];
-      const email = `${sanitizedLogin}@gds.com`;
-      
-      const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
-      const loggedInUser = userCredential.user;
+        // If login does not contain '@', assume it's a custom login and fetch the email
+        if (!values.login.includes('@')) {
+            const loginDocRef = doc(firestore, "logins", values.login);
+            const loginDoc = await getDoc(loginDocRef);
 
-      if (loggedInUser && sanitizedLogin.toLowerCase() === "gds") {
-        const firestore = getFirestore(auth.app);
-        const userDocRef = doc(firestore, "users", loggedInUser.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
-            email: loggedInUser.email,
-            role: "Administrator",
-          });
-          toast({
-            title: "Compte Administrateur Initialisé",
-            description: "Le rôle d'administrateur a été assigné à 'gds'.",
-          });
+            if (loginDoc.exists()) {
+                emailToLogin = loginDoc.data().email;
+            } else {
+                throw new Error("Login not found");
+            }
         }
-      }
+        
+        const userCredential = await signInWithEmailAndPassword(auth, emailToLogin, values.password);
+        const loggedInUser = userCredential.user;
+
+        // Special handling for initial 'gds' admin user setup
+        if (loggedInUser && values.login.toLowerCase() === "gds") {
+            const userDocRef = doc(firestore, "users", loggedInUser.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (!userDoc.exists()) {
+              await setDoc(userDocRef, {
+                email: loggedInUser.email,
+                role: "Administrator",
+              });
+              toast({
+                title: "Compte Administrateur Initialisé",
+                description: "Le rôle d'administrateur a été assigné à 'gds'.",
+              });
+            }
+        }
 
     } catch (error: any) {
-      const message =
-        error.code === "auth/wrong-password" || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential'
-          ? "Utilisateur ou mot de passe incorrect."
-          : "Une erreur de connexion s'est produite.";
+      let message = "Utilisateur ou mot de passe incorrect.";
+      if (error.message === "Login not found") {
+        message = "Le nom d'utilisateur n'existe pas.";
+      } else if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        message = "Utilisateur ou mot de passe incorrect.";
+      } else {
+        message = "Une erreur de connexion s'est produite.";
+      }
 
       setLoginError(message);
       toast({
@@ -146,7 +161,8 @@ export function LoginForm() {
             {loginError && (
               <p className="text-sm font-medium text-destructive">{loginError}</p>
             )}
-            <Button type="submit" className="w-full !mt-6">
+            <Button type="submit" className="w-full !mt-6" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Se connecter
             </Button>
           </form>
