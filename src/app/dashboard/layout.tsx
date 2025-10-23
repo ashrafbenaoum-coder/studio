@@ -41,7 +41,7 @@ export default function DashboardLayout({
   const { setTheme } = useTheme();
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -53,12 +53,12 @@ export default function DashboardLayout({
     if (user) {
       user.getIdTokenResult(true).then((idTokenResult) => {
         const role = (idTokenResult.claims.role as string) || "Viewer";
-        setUserRole(role);
+        setIsAdmin(role === "Administrator");
       });
+    } else {
+        setIsAdmin(false);
     }
   }, [user]);
-
-  const isAdmin = useMemo(() => userRole === "Administrator", [userRole]);
 
   const handleLogout = () => {
     auth.signOut();
@@ -184,9 +184,9 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || !isAdmin}>
-                  {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  <span>{isExporting? "Exportation..." : "Exporter les fichiers"}</span>
+                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || !isAdmin || isUserLoading}>
+                  {isExporting || isUserLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                  <span>{isExporting ? "Exportation..." : (isUserLoading ? "Vérification..." : "Exporter les fichiers")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
@@ -212,7 +212,7 @@ export default function DashboardLayout({
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
                 <DropdownMenuItem asChild>
-                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin ? "pointer-events-none text-muted-foreground" : ""}>
+                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin || isUserLoading ? "pointer-events-none text-muted-foreground" : ""}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
                   </Link>
