@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -43,7 +43,7 @@ export function StoresDashboard() {
       user ? collection(firestore, "users", user.uid, "stores") : null,
     [firestore, user]
   );
-  const { data: stores, isLoading } = useCollection<Omit<Store, "id">>(storesQuery);
+  const { data: stores, isLoading } = useCollection<Store>(storesQuery);
 
   const [newStoreName, setNewStoreName] = useState("");
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
@@ -58,9 +58,9 @@ export function StoresDashboard() {
     }
   };
 
-  const handleDeleteStore = (store: Store) => {
+  const handleDeleteStore = (storeId: string) => {
     if (user) {
-      const docRef = doc(firestore, "users", user.uid, "stores", store.id);
+      const docRef = doc(firestore, "users", user.uid, "stores", storeId);
       deleteDocumentNonBlocking(docRef);
       setStoreToDelete(null);
     }
@@ -81,7 +81,7 @@ export function StoresDashboard() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => storeToDelete && handleDeleteStore(storeToDelete)}>
+            <AlertDialogAction onClick={() => storeToDelete && handleDeleteStore(storeToDelete.id)}>
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
