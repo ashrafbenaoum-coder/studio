@@ -20,7 +20,7 @@ import { useAuth, useUser, useFirestore } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sun, Moon, Monitor, LogOut, FileDown, Users, Loader2 } from "lucide-react";
+import { Sun, Moon, Monitor, LogOut, FileDown, Users, Loader2, KeyRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { collection, getDocs } from "firebase/firestore";
 import type { Store, Aisle, Product } from "@/lib/types";
@@ -204,6 +204,10 @@ export default function DashboardLayout({
                 <DropdownMenuItem disabled={!isAdmin}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    <span>Changer le mot de passe</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
