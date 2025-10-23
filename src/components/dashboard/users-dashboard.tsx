@@ -40,17 +40,8 @@ import {
   FirestorePermissionError,
   errorEmitter
 } from "@/firebase";
-import { collection, doc, getDocs } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 
 
 export function UsersDashboard() {
@@ -65,43 +56,11 @@ export function UsersDashboard() {
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = useMemo(() => adminProfile?.role === "Administrator", [adminProfile]);
 
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     role: "Viewer" as "Administrator" | "Viewer",
   });
-  
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (isAdmin && firestore) {
-        setIsLoadingUsers(true);
-        const usersCollectionRef = collection(firestore, 'users');
-        try {
-            const querySnapshot = await getDocs(usersCollectionRef);
-            const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-            setUsers(usersList);
-        } catch (serverError) {
-          const permissionError = new FirestorePermissionError({
-            path: usersCollectionRef.path,
-            operation: 'list',
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          console.error("Permission error fetching users:", permissionError.message);
-        } finally {
-            setIsLoadingUsers(false);
-        }
-      } else {
-        setIsLoadingUsers(false);
-      }
-    };
-
-    if (!isAdminLoading) {
-        fetchUsers();
-    }
-  }, [isAdmin, firestore, isAdminLoading]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -121,9 +80,8 @@ export function UsersDashboard() {
         });
         return;
     }
-    const usersCollectionRef = collection(firestore, "users");
     // Create a reference for a new document to get a unique ID
-    const newUserRef = doc(usersCollectionRef);
+    const newUserRef = doc(collection(firestore, "users"));
     
     const userData = {
       email: `${newUserData.email}@gds.com`,
@@ -137,9 +95,6 @@ export function UsersDashboard() {
       title: "Profil créé dans Firestore",
       description: `N'oubliez pas de créer un compte d'authentification pour ${userData.email} dans la console Firebase.`,
     });
-    
-    // Optimistically update the UI
-    setUsers(prevUsers => [...prevUsers, { id: newUserRef.id, ...userData }]);
     
     setAddUserDialogOpen(false);
     setNewUserData({ email: "", role: "Viewer" });
@@ -201,15 +156,18 @@ export function UsersDashboard() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Utilisateur</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="text"
-                    value={newUserData.email}
-                    onChange={handleInputChange}
-                    placeholder="nomdutilisateur"
-                    required
-                  />
+                  <div className="flex items-center">
+                    <Input
+                      id="email"
+                      name="email"
+                      type="text"
+                      value={newUserData.email}
+                      onChange={handleInputChange}
+                      placeholder="nomdutilisateur"
+                      required
+                    />
+                    <span className="pl-2 text-muted-foreground">@gds.com</span>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Rôle</Label>
@@ -243,40 +201,9 @@ export function UsersDashboard() {
           </Dialog>
         </CardHeader>
         <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rôle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoadingUsers ? (
-                  <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                    </TableCell>
-                  </TableRow>
-                ) : users.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={2} className="h-24 text-center">
-                      Aucun utilisateur trouvé.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={user.role === 'Administrator' ? 'default' : 'secondary'}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <div className="text-center text-muted-foreground py-12">
+                La gestion des utilisateurs existants (affichage, suppression) se fait désormais via la console Firebase pour plus de sécurité et de stabilité.
+            </div>
         </CardContent>
       </Card>
     </div>
