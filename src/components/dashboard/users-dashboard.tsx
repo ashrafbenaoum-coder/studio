@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Loader2, Trash2 } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
@@ -32,31 +32,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
   useFirestore,
   useUser,
   useMemoFirebase,
   addDocumentNonBlocking,
-  deleteDocumentNonBlocking,
   useDoc,
-  errorEmitter,
-  FirestorePermissionError
 } from "@/firebase";
-import { collection, doc, getDocs } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
 export function UsersDashboard() {
   const { toast } = useToast();
   const firestore = useFirestore();
-  const { user: adminUser } = useUser();
+  const { user: adminUser, isUserLoading: isAdminLoading } = useUser();
 
   const adminProfileRef = useMemoFirebase(
     () => (adminUser ? doc(firestore, "users", adminUser.uid) : null),
@@ -65,48 +53,15 @@ export function UsersDashboard() {
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = useMemo(() => adminProfile?.role === "Administrator", [adminProfile]);
 
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [areUsersLoading, setUsersLoading] = useState(true);
-
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     role: "Viewer" as "Administrator" | "Viewer",
   });
   
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (isAdmin && firestore) {
-        setUsersLoading(true);
-        const usersCollectionRef = collection(firestore, "users");
-        
-        getDocs(usersCollectionRef)
-          .then(querySnapshot => {
-            const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-            setUsers(usersList);
-            setUsersLoading(false);
-          })
-          .catch(serverError => {
-            const permissionError = new FirestorePermissionError({
-              path: usersCollectionRef.path,
-              operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            setUsersLoading(false); // Stop loading on error
-          });
-
-      } else if (adminProfile) {
-        setUsersLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, [isAdmin, firestore, adminProfile, toast]);
-
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewUserData((prev) => ({ ...prev, [name]: value }));
+    setNewUserData((prev) => ({ ...prev, [name]: value.replace('@gds.com', '') }));
   };
 
   const handleRoleChange = (value: "Administrator" | "Viewer") => {
@@ -118,42 +73,41 @@ export function UsersDashboard() {
         toast({
             variant: "destructive",
             title: "Erreur",
-            description: "Veuillez entrer une adresse e-mail.",
+            description: "Veuillez entrer un nom d'utilisateur.",
         });
         return;
     }
     const usersCollectionRef = collection(firestore, "users");
+    
     // This adds user data to Firestore, but authentication must be handled in the Firebase Console.
     addDocumentNonBlocking(usersCollectionRef, {
-      email: newUserData.email,
+      email: `${newUserData.email}@gds.com`,
       role: newUserData.role,
     });
     
     toast({
       title: "Profil créé dans Firestore",
-      description: `N'oubliez pas de créer un compte d'authentification pour ${newUserData.email} dans la console Firebase.`,
+      description: `N'oubliez pas de créer un compte d'authentification pour ${newUserData.email}@gds.com dans la console Firebase.`,
     });
     
-    // Optimistically update the UI
-    setUsers(prevUsers => [...prevUsers, { id: 'temp-' + Date.now(), ...newUserData }]);
     setAddUserDialogOpen(false);
     setNewUserData({ email: "", role: "Viewer" });
   };
   
-  const handleDeleteUser = (userId: string) => {
-    if (adminUser?.uid === userId) {
-        toast({ variant: "destructive", title: "Action non autorisée", description: "Vous ne pouvez pas supprimer votre propre compte." });
-        return;
-    }
-    const docRef = doc(firestore, "users", userId);
-    deleteDocumentNonBlocking(docRef);
-    
-    // Optimistically update the UI
-    setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
-    toast({ title: "Utilisateur supprimé", description: "L'enregistrement de l'utilisateur a été supprimé de Firestore." });
-  };
+  if (isAdminLoading) {
+     return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Chargement...</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+            </CardContent>
+        </Card>
+     );
+  }
 
-  if (!isAdmin && !areUsersLoading) {
+  if (!isAdmin) {
     return (
         <Card>
             <CardHeader>
@@ -195,14 +149,14 @@ export function UsersDashboard() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Utilisateur</Label>
                   <Input
                     id="email"
                     name="email"
-                    type="email"
+                    type="text"
                     value={newUserData.email}
                     onChange={handleInputChange}
-                    placeholder="utilisateur@gds.com"
+                    placeholder="nomdutilisateur"
                     required
                   />
                 </div>
@@ -238,52 +192,9 @@ export function UsersDashboard() {
           </Dialog>
         </CardHeader>
         <CardContent>
-           <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rôle</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {areUsersLoading ? (
-                   <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                    </TableCell>
-                  </TableRow>
-                ) : users?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                      Aucun profil utilisateur trouvé dans Firestore.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users?.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.email.replace('@gds.com', '')}</TableCell>
-                        <TableCell>
-                          <Badge variant={user.role === 'Administrator' ? 'default' : 'secondary'}>
-                            {user.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-destructive" 
-                            onClick={() => handleDeleteUser(user.id)}
-                            disabled={adminUser?.uid === user.id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
+           <div className="text-center text-muted-foreground py-12">
+             La gestion des utilisateurs (création de compte, suppression, etc.) se fait désormais via la console Firebase pour plus de sécurité.
+           </div>
         </CardContent>
       </Card>
     </div>
