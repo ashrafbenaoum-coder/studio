@@ -46,7 +46,9 @@ import {
   useMemoFirebase,
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
-  useDoc
+  useDoc,
+  errorEmitter,
+  FirestorePermissionError
 } from "@/firebase";
 import { collection, doc, getDocs } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
@@ -71,28 +73,29 @@ export function UsersDashboard() {
     email: "",
     role: "Viewer" as "Administrator" | "Viewer",
   });
-
+  
   useEffect(() => {
     const fetchUsers = async () => {
       if (isAdmin && firestore) {
         setUsersLoading(true);
         const usersCollectionRef = collection(firestore, "users");
-        try {
-          const querySnapshot = await getDocs(usersCollectionRef);
-          const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-          setUsers(usersList);
-        } catch (error) {
-          console.error("Error fetching users:", error);
-          toast({
-            variant: "destructive",
-            title: "Erreur",
-            description: "Impossible de charger la liste des utilisateurs.",
+        
+        getDocs(usersCollectionRef)
+          .then(querySnapshot => {
+            const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+            setUsers(usersList);
+            setUsersLoading(false);
+          })
+          .catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+              path: usersCollectionRef.path,
+              operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setUsersLoading(false); // Stop loading on error
           });
-        } finally {
-          setUsersLoading(false);
-        }
+
       } else if (adminProfile) {
-        // Not an admin or firestore not ready, stop loading.
         setUsersLoading(false);
       }
     };
@@ -127,7 +130,7 @@ export function UsersDashboard() {
     });
     
     toast({
-      title: "Profil créé dans la base de données",
+      title: "Profil créé dans Firestore",
       description: `N'oubliez pas de créer un compte d'authentification pour ${newUserData.email} dans la console Firebase.`,
     });
     
@@ -150,7 +153,7 @@ export function UsersDashboard() {
     toast({ title: "Utilisateur supprimé", description: "L'enregistrement de l'utilisateur a été supprimé de Firestore." });
   };
 
-  if (!isAdmin) {
+  if (!isAdmin && !areUsersLoading) {
     return (
         <Card>
             <CardHeader>
@@ -170,7 +173,7 @@ export function UsersDashboard() {
           <div>
             <CardTitle>Gérer les utilisateurs</CardTitle>
             <CardDescription>
-              Ajoutez des profils ici, puis créez leurs comptes d'authentification dans la console Firebase.
+             Créez un profil ici, puis créez son compte dans la console d'authentification Firebase.
             </CardDescription>
           </div>
           <Dialog
@@ -253,13 +256,13 @@ export function UsersDashboard() {
                 ) : users?.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                      Aucun utilisateur trouvé.
+                      Aucun profil utilisateur trouvé dans Firestore.
                     </TableCell>
                   </TableRow>
                 ) : (
                   users?.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell className="font-medium">{user.email.replace('@gds.com', '')}</TableCell>
                         <TableCell>
                           <Badge variant={user.role === 'Administrator' ? 'default' : 'secondary'}>
                             {user.role}
