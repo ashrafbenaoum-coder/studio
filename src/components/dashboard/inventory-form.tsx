@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -37,37 +37,51 @@ const formSchema = z.object({
 });
 
 const pickingRanges: Record<string, { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; }> = {
-    A1: {
-      impairStart: "A-001-0001-00",
-      impairEnd: "A-001-0205-00",
-      pairStart: "A-001-0200-00",
-      pairEnd: "A-001-0002-00",
-    },
-    B5: {
-      impairStart: "B-005-0001-00",
-      impairEnd: "B-005-0205-00",
-      pairStart: "B-005-0200-00",
-      pairEnd: "B-005-0002-00",
-    },
+    A1: { impairStart: "A-001-0001-00", impairEnd: "A-001-0205-00", pairStart: "A-001-0200-00", pairEnd: "A-001-0002-00" },
+    A2: { impairStart: "A-002-0001-00", impairEnd: "A-002-0205-00", pairStart: "A-002-0200-00", pairEnd: "A-002-0002-00" },
+    A3: { impairStart: "A-003-0001-00", impairEnd: "A-003-0205-00", pairStart: "A-003-0200-00", pairEnd: "A-003-0002-00" },
+    A4: { impairStart: "A-004-0001-00", impairEnd: "A-004-0205-00", pairStart: "A-004-0200-00", pairEnd: "A-004-0002-00" },
+    B1: { impairStart: "B-001-0001-00", impairEnd: "B-001-0205-00", pairStart: "B-001-0200-00", pairEnd: "B-001-0002-00" },
+    B2: { impairStart: "B-002-0001-00", impairEnd: "B-002-0205-00", pairStart: "B-002-0200-00", pairEnd: "B-002-0002-00" },
+    B3: { impairStart: "B-003-0001-00", impairEnd: "B-003-0205-00", pairStart: "B-003-0200-00", pairEnd: "B-003-0002-00" },
+    B4: { impairStart: "B-004-0001-00", impairEnd: "B-004-0205-00", pairStart: "B-004-0200-00", pairEnd: "B-004-0002-00" },
+    B5: { impairStart: "B-005-0001-00", impairEnd: "B-005-0205-00", pairStart: "B-005-0200-00", pairEnd: "B-005-0002-00" },
 };
 
 type InventoryFormProps = {
   onAddProduct: (product: Omit<Product, "id" | "storeId" | "aisleId">) => void;
+  aisleName?: string;
 };
 
-export function InventoryForm({ onAddProduct }: InventoryFormProps) {
+export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
   const { toast } = useToast();
   const [isScannerOpen, setScannerOpen] = useState(false);
+
+  const getInitialAddress = (name?: string) => {
+    if (name && pickingRanges[name]) {
+      return pickingRanges[name].impairStart;
+    }
+    return "";
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      address: "A-001-0001-00", 
+      address: getInitialAddress(aisleName),
       barcode: "",
       quantity: 0,
       expirationDate: "",
     },
   });
+
+  useEffect(() => {
+    form.reset({
+      address: getInitialAddress(aisleName),
+      barcode: "",
+      quantity: 0,
+      expirationDate: ""
+    });
+  }, [aisleName, form]);
 
   function getNextAddress(current: string, rayonKey: string): string | null {
     const range = pickingRanges[rayonKey];
@@ -97,14 +111,9 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
   function onSubmit(values: z.infer<typeof formSchema>) {
     onAddProduct(values);
   
-    const addressPrefix = values.address.substring(0, 5); // e.g., "A-001"
-    
-    const rayonKey = Object.keys(pickingRanges).find((key) => {
-        const range = pickingRanges[key];
-        return range.impairStart.startsWith(addressPrefix.substring(0,1)) && range.impairStart.includes(`-${addressPrefix.substring(2,5)}-`);
-    });
+    const rayonKey = aisleName;
 
-    if (rayonKey) {
+    if (rayonKey && pickingRanges[rayonKey]) {
       const nextAddress = getNextAddress(values.address, rayonKey);
       if (nextAddress) {
         form.reset({
@@ -122,6 +131,11 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
         form.reset({ address: "", barcode: "", quantity: 0, expirationDate: ""});
       }
     } else {
+        toast({
+          variant: "destructive",
+          title: "Rayon non configuré",
+          description: `La logique de picking pour le rayon ${rayonKey} n'est pas définie.`,
+        });
         form.reset({ address: "", barcode: "", quantity: 0, expirationDate: ""});
     }
   }

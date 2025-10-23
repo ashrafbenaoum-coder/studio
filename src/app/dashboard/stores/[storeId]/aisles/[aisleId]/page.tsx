@@ -141,7 +141,7 @@ export default function InventoryPage({ params }: { params: Promise<{ storeId: s
         </Breadcrumb>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            <InventoryForm onAddProduct={addProduct} />
+            <InventoryForm onAddProduct={addProduct} aisleName={aisle?.name} />
             <InventoryList
               products={products || []}
               isLoading={areProductsLoading}
@@ -161,3 +161,5 @@ export default function InventoryPage({ params }: { params: Promise<{ storeId: s
     </div>
   );
 }
+
+    
