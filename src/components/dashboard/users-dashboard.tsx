@@ -27,9 +27,19 @@ import {
   DialogClose,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, UserPlus, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { UserPlus, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -38,24 +48,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Mock data for now
-const mockUsers = [
+interface User {
+  id: string;
+  email: string;
+  role: string;
+}
+
+// Mock data for now, representing users in the system
+const initialUsers: User[] = [
   { id: "1", email: "user1@example.com", role: "Viewer" },
   { id: "2", email: "user2@example.com", role: "Editor" },
 ];
 
 export function UsersDashboard() {
   const { toast } = useToast();
+  const [users, setUsers] = useState<User[]>(initialUsers);
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
 
   const handleCreateUser = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
     
-    // TODO: Implement actual user creation with Firebase Admin SDK
-    console.log("Creating user:", { email, password });
+    // Simulate creating a user
+    const newUser: User = {
+      id: (Math.random() * 10000).toString(),
+      email,
+      role: "Viewer", // Default role
+    };
+
+    setUsers(prevUsers => [...prevUsers, newUser]);
     
     toast({
       title: "Utilisateur créé (Simulation)",
@@ -63,6 +88,43 @@ export function UsersDashboard() {
     });
     setAddUserDialogOpen(false);
   };
+  
+  const openDeleteConfirm = (user: User) => {
+    setUserToDelete(user);
+  };
+  
+  const handleDeleteUser = () => {
+    if (userToDelete) {
+      setUsers(prevUsers => prevUsers.filter(u => u.id !== userToDelete.id));
+      toast({
+        title: "Utilisateur supprimé (Simulation)",
+        description: `L'utilisateur ${userToDelete.email} a été supprimé.`,
+      });
+      setUserToDelete(null);
+    }
+  };
+  
+  const openEditDialog = (user: User) => {
+    setUserToEdit(user);
+    setEditUserDialogOpen(true);
+  };
+
+  const handleUpdateUser = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!userToEdit) return;
+
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+
+    setUsers(prevUsers => prevUsers.map(u => u.id === userToEdit.id ? { ...u, email } : u));
+    
+    toast({
+      title: "Utilisateur modifié (Simulation)",
+      description: `Les informations de l'utilisateur ont été mises à jour.`,
+    });
+    setEditUserDialogOpen(false);
+    setUserToEdit(null);
+  }
 
   return (
     <div className="space-y-6">
@@ -97,7 +159,6 @@ export function UsersDashboard() {
                   <Label htmlFor="password">Mot de passe</Label>
                   <Input id="password" name="password" type="password" required />
                 </div>
-                {/* TODO: Add role/permission selection here */}
                 <DialogFooter>
                   <DialogClose asChild>
                     <Button type="button" variant="ghost">
@@ -120,7 +181,7 @@ export function UsersDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockUsers.map((user) => (
+              {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.email}</TableCell>
                   <TableCell>{user.role}</TableCell>
@@ -132,11 +193,11 @@ export function UsersDashboard() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEditDialog(user)}>
                           <Edit className="mr-2 h-4 w-4" />
                           <span>Modifier</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem className="text-destructive" onClick={() => openDeleteConfirm(user)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           <span>Supprimer</span>
                         </DropdownMenuItem>
@@ -149,6 +210,44 @@ export function UsersDashboard() {
           </Table>
         </CardContent>
       </Card>
+      
+      {/* Edit User Dialog */}
+      <Dialog open={isEditUserDialogOpen} onOpenChange={setEditUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier l'utilisateur</DialogTitle>
+          </DialogHeader>
+          {userToEdit && (
+             <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Logine</Label>
+                <Input id="edit-email" name="email" type="email" defaultValue={userToEdit.email} required />
+              </div>
+              {/* TODO: Add role editing here */}
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="ghost">Annuler</Button></DialogClose>
+                <Button type="submit">Enregistrer</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous sûr?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera l'utilisateur "{userToDelete?.email}" de manière permanente (simulation).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser}>Supprimer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
