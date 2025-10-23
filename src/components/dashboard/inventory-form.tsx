@@ -32,7 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CalculatorPopover } from "./calculator-popover";
 
 const formSchema = z.object({
-  address: z.string().min(1, "Adresse est requise."),
+  address: z.string().regex(/^A-\d{3}-\d{4}-\d{2}$/, "Le format de l'adresse doit être A-XXX-XXXX-XX."),
   barcode: z.string().min(1, "Code barre est requis."),
   quantity: z.coerce.number().min(0, "La quantité ne peut pas être négative."),
   expirationDate: z.string().regex(/^\d{8}$/, "La date doit être au format YYYYMMDD."),
@@ -93,7 +93,7 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                       <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <FormControl>
                         <Input
-                          placeholder="Ex: Allée 5, Étagère 2"
+                          placeholder="Ex: A-001-0001-01"
                           {...field}
                           className="pl-10"
                         />
