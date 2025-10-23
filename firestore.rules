@@ -2,139 +2,147 @@
  * @fileoverview Firestore Security Rules for Inventory Management App
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model. Each user has complete control over their own data,
- * including stores, aisles, and products. No data is shared between users.
+ * This ruleset enforces a strict user-ownership model. Users can only
+ * access data that they explicitly own, preventing unauthorized data access.
  *
  * Data Structure:
- * All data is nested under /users/{userId}, ensuring clear ownership and isolation.
- *   - /users/{userId} : User profile information.
- *   - /users/{userId}/stores/{storeId} : Stores owned by the user.
- *   - /users/{userId}/stores/{storeId}/aisles/{aisleId} : Aisles within a store.
- *   - /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId} : Products in an aisle.
+ * The data is structured hierarchically under `/users/{userId}`, ensuring
+ * clear ownership. Each user's data (stores, aisles, products) resides
+ * under their unique user ID.
  *
  * Key Security Decisions:
- * - Users can only access their own data.
- * - Listing all users is disallowed.
+ * - Users can only read/write their own profile data.
+ * - Users can create, read, update, and delete stores, aisles, and products
+ *   under their ownership.
+ * - Listing all users in the database is explicitly forbidden.
  *
  * Denormalization for Authorization:
- *  - N/A: The data structure inherently supports owner-only access, so denormalization is not required.
+ * The `storeId`, `aisleId`, and `userId` are included directly within
+ * the documents to avoid costly `get()` calls in security rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Prevents listing all users. User profiles are only accessible by the user themselves.
-     * @path /users
-     * @allow (get) User with matching {userId} can get their profile.
-     * @deny (list) No user can list all user profiles.
-     * @principle Prevents unauthorized access to user data.
-     */
-    match /users {
-      allow get: if false;
-      allow list: if false;
-    }
-
-    /**
-     * @description Manages user profile information.
-     * @path /users/{userId}
-     * @allow (create) Authenticated user with matching {userId} can create their profile.
-     * @allow (get) Authenticated user with matching {userId} can get their profile.
-     * @allow (update) Authenticated user with matching {userId} can update their profile.
-     * @allow (delete) Authenticated user with matching {userId} can delete their profile.
-     * @deny (create) Authenticated user cannot create a profile with a mismatched {userId}.
-     * @deny (get) Authenticated user cannot get a profile with a mismatched {userId}.
-     * @deny (update) Authenticated user cannot update a profile with a mismatched {userId}.
-     * @deny (delete) Authenticated user cannot delete a profile with a mismatched {userId}.
-     * @principle Enforces document ownership for writes.
+     * @description Controls access to the `/users` collection. Only the owner can read or write their own document. Listing the collection is denied.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (get) - Authenticated user can retrieve their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'get', path: '/databases/(default)/documents/users/user123' }
+     * @allow (create) - Authenticated user can create their own profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'create', path: '/databases/(default)/documents/users/user123' }
+     * @allow (update) - Authenticated user can update their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'update', path: '/databases/(default)/documents/users/user123' }
+     * @allow (delete) - Authenticated user can delete their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'delete', path: '/databases/(default)/documents/users/user123' }
+     * @deny (list) - Prevents listing all user profiles.
+     *   Request: { auth: { uid: 'anyUser' }, method: 'list', path: '/databases/(default)/documents/users' }
+     * @deny (create) - Unauthenticated user tries to create a profile.
+     *   Request: { auth: null, method: 'create', path: '/databases/(default)/documents/users/user123' }
+     * @deny (update) - Another user tries to update someone else's profile.
+     *   Request: { auth: { uid: 'otherUser' }, method: 'update', path: '/databases/(default)/documents/users/user123' }
+     * @principle Enforces document ownership and prevents unauthorized access to user data.
      */
     match /users/{userId} {
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
-      allow get: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId) && resource.data.id == request.resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Manages stores created by a specific user.
-     * @path /users/{userId}/stores/{storeId}
-     * @allow (create) Authenticated user with matching {userId} can create a store.
-     * @allow (get) Authenticated user with matching {userId} can get their store.
-     * @allow (list) Authenticated user with matching {userId} can list their stores.
-     * @allow (update) Authenticated user with matching {userId} can update their store.
-     * @allow (delete) Authenticated user with matching {userId} can delete their store.
-     * @deny (create) Authenticated user cannot create a store with a mismatched {userId}.
-     * @deny (get) Authenticated user cannot get a store with a mismatched {userId}.
-     * @deny (list) Authenticated user cannot list stores with a mismatched {userId}.
-     * @deny (update) Authenticated user cannot update a store with a mismatched {userId}.
-     * @deny (delete) Authenticated user cannot delete a store with a mismatched {userId}.
-     * @principle Enforces document ownership for writes.
+     * @description Controls access to the `/stores` subcollection under a user's document. Only the owner can create, read, update, or delete stores.
+     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}
+     * @allow (create) - Authenticated user can create a store under their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'create', path: '/databases/(default)/documents/users/user123/stores/store456' }
+     * @allow (get) - Authenticated user can retrieve a store under their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'get', path: '/databases/(default)/documents/users/user123/stores/store456' }
+     * @allow (list) - Authenticated user can list the stores under their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'list', path: '/databases/(default)/documents/users/user123/stores' }
+     * @allow (update) - Authenticated user can update a store under their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'update', path: '/databases/(default)/documents/users/user123/stores/store456' }
+     * @allow (delete) - Authenticated user can delete a store under their profile.
+     *   Request: { auth: { uid: 'user123' }, method: 'delete', path: '/databases/(default)/documents/users/user123/stores/store456' }
+     * @deny (create) - Another user tries to create a store in someone else's profile.
+     *   Request: { auth: { uid: 'otherUser' }, method: 'create', path: '/databases/(default)/documents/users/user123/stores/store456' }
+     * @deny (update) - Unauthenticated user tries to update a store.
+     *   Request: { auth: null, method: 'update', path: '/databases/(default)/documents/users/user123/stores/store456' }
+     * @principle Enforces document ownership and restricts store management to the owning user.
      */
     match /users/{userId}/stores/{storeId} {
-      allow create: if isSignedIn() && isOwner(userId);
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Manages aisles within a specific store belonging to a user.
-     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}
-     * @allow (create) Authenticated user with matching {userId} can create an aisle.
-     * @allow (get) Authenticated user with matching {userId} can get their aisle.
-     * @allow (list) Authenticated user with matching {userId} can list their aisles.
-     * @allow (update) Authenticated user with matching {userId} can update their aisle.
-     * @allow (delete) Authenticated user with matching {userId} can delete their aisle.
-     * @deny (create) Authenticated user cannot create an aisle with a mismatched {userId}.
-     * @deny (get) Authenticated user cannot get an aisle with a mismatched {userId}.
-     * @deny (list) Authenticated user cannot list aisles with a mismatched {userId}.
-     * @deny (update) Authenticated user cannot update an aisle with a mismatched {userId}.
-     * @deny (delete) Authenticated user cannot delete an aisle with a mismatched {userId}.
-     * @principle Enforces document ownership for writes.
+     * @description Controls access to the `/aisles` subcollection under a user's store. Only the store owner can manage aisles.
+     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}/aisles/{aisleId}
+     * @allow (create) - Authenticated user can create an aisle in their store.
+     *   Request: { auth: { uid: 'user123' }, method: 'create', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789' }
+     * @allow (get) - Authenticated user can retrieve an aisle from their store.
+     *   Request: { auth: { uid: 'user123' }, method: 'get', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789' }
+     * @allow (list) - Authenticated user can list the aisles in their store.
+     *   Request: { auth: { uid: 'user123' }, method: 'list', path: '/databases/(default)/documents/users/user123/stores/store456/aisles' }
+     * @allow (update) - Authenticated user can update an aisle in their store.
+     *   Request: { auth: { uid: 'user123' }, method: 'update', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789' }
+     * @allow (delete) - Authenticated user can delete an aisle from their store.
+     *   Request: { auth: { uid: 'user123' }, method: 'delete', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789' }
+     * @deny (create) - Another user tries to create an aisle in someone else's store.
+     *   Request: { auth: { uid: 'otherUser' }, method: 'create', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789' }
+     * @deny (update) - Unauthenticated user tries to update an aisle.
+     *   Request: { auth: null, method: 'update', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789' }
+     * @principle Enforces document ownership and restricts aisle management to the store owner.
      */
     match /users/{userId}/stores/{storeId}/aisles/{aisleId} {
-      allow create: if isSignedIn() && isOwner(userId);
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Manages products within a specific aisle, in a specific store, belonging to a user.
-     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
-     * @allow (create) Authenticated user with matching {userId} can create a product.
-     * @allow (get) Authenticated user with matching {userId} can get their product.
-     * @allow (list) Authenticated user with matching {userId} can list their products.
-     * @allow (update) Authenticated user with matching {userId} can update their product.
-     * @allow (delete) Authenticated user with matching {userId} can delete their product.
-     * @deny (create) Authenticated user cannot create a product with a mismatched {userId}.
-     * @deny (get) Authenticated user cannot get a product with a mismatched {userId}.
-     * @deny (list) Authenticated user cannot list products with a mismatched {userId}.
-     * @deny (update) Authenticated user cannot update a product with a mismatched {userId}.
-     * @deny (delete) Authenticated user cannot delete a product with a mismatched {userId}.
-     * @principle Enforces document ownership for writes.
+     * @description Controls access to the `/products` subcollection under a user's aisle in a store. Only the owner can manage products.
+     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
+     * @allow (create) - Authenticated user can create a product in their aisle.
+     *   Request: { auth: { uid: 'user123' }, method: 'create', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products/product012' }
+     * @allow (get) - Authenticated user can retrieve a product from their aisle.
+     *   Request: { auth: { uid: 'user123' }, method: 'get', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products/product012' }
+     * @allow (list) - Authenticated user can list the products in their aisle.
+     *   Request: { auth: { uid: 'user123' }, method: 'list', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products' }
+     * @allow (update) - Authenticated user can update a product in their aisle.
+     *   Request: { auth: { uid: 'user123' }, method: 'update', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products/product012' }
+     * @allow (delete) - Authenticated user can delete a product from their aisle.
+     *   Request: { auth: { uid: 'user123' }, method: 'delete', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products/product012' }
+     * @deny (create) - Another user tries to create a product in someone else's aisle.
+     *   Request: { auth: { uid: 'otherUser' }, method: 'create', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products/product012' }
+     * @deny (update) - Unauthenticated user tries to update a product.
+     *   Request: { auth: null, method: 'update', path: '/databases/(default)/documents/users/user123/stores/store456/aisles/aisle789/products/product012' }
+     * @principle Enforces document ownership and restricts product management to the owning user.
      */
     match /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId} {
-      allow create: if isSignedIn() && isOwner(userId);
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
   }
 
-  // Helper Functions
+  // Helper functions
   function isSignedIn() {
     return request.auth != null;
   }
 
   function isOwner(userId) {
-    return request.auth.uid == userId;
+    return isSignedIn() && request.auth.uid == userId;
   }
 
   function isExistingOwner(userId) {
-    return isSignedIn() && isOwner(userId) && resource != null;
+    return isOwner(userId) && resource != null;
   }
 }
