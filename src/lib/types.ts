@@ -22,4 +22,11 @@ export interface Product {
   storeId: string;
 }
 
+export interface UserProfile {
+    id: string;
+    email: string;
+    role: "Administrator" | "Viewer";
+    displayName?: string;
+}
+
 export type Alert = AnalyzeExpirationDatesOutput[0];

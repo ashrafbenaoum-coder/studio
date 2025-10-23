@@ -28,14 +28,9 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
-  username: z.string().min(1, "Nom d'utilisateur est requis."),
+  email: z.string().email("L'adresse e-mail n'est pas valide."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
-
-const hardcodedFirebaseEmail = "gds@gds.com";
-const hardcodedFirebasePassword = "gdsidl";
-const requiredUsername = "login";
-const requiredPassword = "login";
 
 export function LoginForm() {
   const router = useRouter();
@@ -47,7 +42,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -60,25 +55,19 @@ export function LoginForm() {
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
-    if (values.username !== requiredUsername || values.password !== requiredPassword) {
-      setLoginError("Nom d'utilisateur ou mot de passe incorrect.");
-      return;
-    }
-
     try {
-      await signInWithEmailAndPassword(auth, hardcodedFirebaseEmail, hardcodedFirebasePassword);
+      await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
       console.error("Firebase sign-in error:", error);
-      // This might happen if the user was deleted from Firebase console
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-         setLoginError("Le compte principal n'existe pas. Veuillez contacter le support.");
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+         setLoginError("L'adresse e-mail ou le mot de passe est incorrect.");
       } else {
         setLoginError("Une erreur de connexion s'est produite.");
       }
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
-        description: "Une erreur s'est produite lors de la connexion. Veuillez réessayer.",
+        description: "Veuillez vérifier vos informations d'identification et réessayer.",
       });
     }
   };
@@ -106,12 +95,12 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
             <FormField
               control={form.control}
-              name="username"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom d'utilisateur</FormLabel>
+                  <FormLabel>Adresse e-mail</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input type="email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

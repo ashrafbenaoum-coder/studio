@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
@@ -16,14 +17,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
-import { useAuth, useUser, useFirestore } from "@/firebase";
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sun, Moon, Monitor, LogOut, FileDown, Users, Loader2, KeyRound } from "lucide-react";
 import { useTheme } from "next-themes";
-import { collection, getDocs } from "firebase/firestore";
-import type { Store, Aisle, Product } from "@/lib/types";
+import { collection, getDocs, doc } from "firebase/firestore";
+import type { Store, Aisle, Product, UserProfile } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/actions";
 import { saveAs } from "file-saver";
@@ -42,15 +43,13 @@ export default function DashboardLayout({
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
 
-  // Assume user with this email has the 'Administrator' role for now.
-  const userRole = useMemo(() => {
-    if (user?.email === "gds@gds.com") {
-      return "Administrator";
-    }
-    return "Viewer"; // Default role
-  }, [user]);
+  const userProfileRef = useMemoFirebase(
+    () => (user ? doc(firestore, "users", user.uid) : null),
+    [user, firestore]
+  );
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const isAdmin = userRole === "Administrator";
+  const isAdmin = useMemo(() => userProfile?.role === "Administrator", [userProfile]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -210,7 +209,7 @@ export default function DashboardLayout({
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
                 <DropdownMenuItem asChild disabled={!isAdmin}>
-                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin ? "pointer-events-none" : ""}>
+                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin ? "pointer-events-none text-muted-foreground" : ""}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
                   </Link>
@@ -233,5 +232,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-
-    
