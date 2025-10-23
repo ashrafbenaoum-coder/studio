@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,12 +16,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sun, Moon, Monitor, LogOut, FileDown, Users } from "lucide-react";
+import { Sun, Moon, Monitor, LogOut, FileDown, Users, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { collection, getDocs } from "firebase/firestore";
+import type { Store, Aisle, Product } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/lib/actions";
+import { saveAs } from "file-saver";
 
 
 export default function DashboardLayout({
@@ -30,8 +36,11 @@ export default function DashboardLayout({
 }) {
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
   const { setTheme } = useTheme();
+  const { toast } = useToast();
+  const [isExporting, startExportTransition] = useTransition();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -42,6 +51,75 @@ export default function DashboardLayout({
   const handleLogout = () => {
     auth.signOut();
   };
+
+  const handleExportAllStores = () => {
+    if (!user) return;
+    
+    startExportTransition(async () => {
+      try {
+        const storesQuery = collection(firestore, "users", user.uid, "stores");
+        const storesSnapshot = await getDocs(storesQuery);
+        const stores = storesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Store));
+
+        if (stores.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Aucune donnée à exporter",
+                description: "Il n'y a aucun magasin à exporter.",
+            });
+            return;
+        }
+
+        let allProducts: (Product & { storeName?: string; aisleName?: string; })[] = [];
+
+        for (const store of stores) {
+          const aislesQuery = collection(firestore, "users", user.uid, "stores", store.id, "aisles");
+          const aislesSnapshot = await getDocs(aislesQuery);
+          const aisles = aislesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Aisle));
+
+          for (const aisle of aisles) {
+            const productsQuery = collection(firestore, "users", user.uid, "stores", store.id, "aisles", aisle.id, "products");
+            const productsSnapshot = await getDocs(productsQuery);
+            const aisleProducts = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, storeName: store.name, aisleName: aisle.name }));
+            allProducts = [...allProducts, ...aisleProducts];
+          }
+        }
+        
+        if (allProducts.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Aucun produit à exporter",
+            description: "Aucun produit n'a été trouvé dans l'ensemble des magasins.",
+          });
+          return;
+        }
+
+        const base64Data = await exportToExcel(allProducts);
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, `inventaire-global-${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        toast({
+          title: "Exportation terminée",
+          description: "L'inventaire global a été téléchargé avec succès.",
+        });
+
+      } catch (error) {
+        console.error("Failed to export all data:", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur d'exportation",
+          description: "L'exportation des données a échoué. Veuillez réessayer.",
+        });
+      }
+    });
+  };
+
 
   if (isUserLoading || !user) {
     return (
@@ -94,9 +172,9 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <FileDown className="mr-2 h-4 w-4" />
-                  <span>Exporter les fichiers</span>
+                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                  <span>{isExporting? "Exportation..." : "Exporter les fichiers"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>

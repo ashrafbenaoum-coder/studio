@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Store as StoreIcon, Trash2, Loader2, FileSpreadsheet } from "lucide-react";
-import type { Store, Aisle, Product } from "@/lib/types";
+import { Plus, Store as StoreIcon, Trash2, Loader2 } from "lucide-react";
+import type { Store } from "@/lib/types";
 import {
   useCollection,
   useFirestore,
@@ -32,16 +32,11 @@ import {
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
 } from "@/firebase";
-import { collection, doc, getDocs } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
-import { exportToExcel } from "@/lib/actions";
-import { saveAs } from "file-saver";
+import { collection, doc } from "firebase/firestore";
 
 export function StoresDashboard() {
   const { user } = useUser();
   const firestore = useFirestore();
-  const { toast } = useToast();
-  const [isExporting, startExportTransition] = useTransition();
 
   const storesQuery = useMemoFirebase(
     () =>
@@ -71,68 +66,6 @@ export function StoresDashboard() {
     }
   };
 
-  const handleExportAllStores = () => {
-    if (!user || !stores || stores.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Aucune donnée à exporter",
-        description: "Il n'y a aucun magasin à exporter.",
-      });
-      return;
-    }
-
-    startExportTransition(async () => {
-      try {
-        let allProducts: Product[] = [];
-
-        for (const store of stores) {
-          const aislesQuery = collection(firestore, "users", user.uid, "stores", store.id, "aisles");
-          const aislesSnapshot = await getDocs(aislesQuery);
-          const aisles = aislesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Aisle));
-
-          for (const aisle of aisles) {
-            const productsQuery = collection(firestore, "users", user.uid, "stores", store.id, "aisles", aisle.id, "products");
-            const productsSnapshot = await getDocs(productsQuery);
-            const aisleProducts = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, storeName: store.name, aisleName: aisle.name } as Product & { storeName: string; aisleName: string; }));
-            allProducts = [...allProducts, ...aisleProducts];
-          }
-        }
-        
-        if (allProducts.length === 0) {
-          toast({
-            variant: "destructive",
-            title: "Aucun produit à exporter",
-            description: "Aucun produit n'a été trouvé dans l'ensemble des magasins.",
-          });
-          return;
-        }
-
-        const base64Data = await exportToExcel(allProducts);
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `inventaire-global-${new Date().toISOString().split('T')[0]}.xlsx`);
-
-        toast({
-          title: "Exportation terminée",
-          description: "L'inventaire global a été téléchargé avec succès.",
-        });
-
-      } catch (error) {
-        console.error("Failed to export all data:", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur d'exportation",
-          description: "L'exportation des données a échoué. Veuillez réessayer.",
-        });
-      }
-    });
-  };
-
   return (
     <div className="space-y-6">
       <AlertDialog
@@ -156,21 +89,13 @@ export function StoresDashboard() {
       </AlertDialog>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
             <div>
               <CardTitle>Gérer les magasins</CardTitle>
               <CardDescription>
                 Ajoutez un nouveau magasin ou sélectionnez-en un pour gérer ses rayons.
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExportAllStores} disabled={isExporting}>
-                {isExporting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                )}
-                {isExporting ? "Exportation..." : "Exporter tout"}
-            </Button>
         </CardHeader>
         <CardContent className="flex gap-2">
           <Input
