@@ -1,11 +1,10 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus } from "lucide-react";
+import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -150,6 +149,19 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
     }
     setScannerOpen(false);
   };
+  
+  const handleClearForm = () => {
+    form.reset({
+      address: getInitialAddress(aisleName),
+      barcode: "",
+      quantity: 0,
+      expirationDate: "",
+    });
+    toast({
+      title: "Champs réinitialisés",
+      description: "Le formulaire a été vidé.",
+    });
+  };
 
   return (
     <>
@@ -283,10 +295,16 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
                 />
               </div>
 
-              <Button type="submit" className="w-full !mt-6">
-                <Save className="mr-2 h-4 w-4" />
-                Enregistrer
-              </Button>
+              <div className="flex w-full gap-2 !mt-6">
+                <Button type="button" variant="outline" className="w-full" onClick={handleClearForm}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Réinitialiser
+                </Button>
+                <Button type="submit" className="w-full">
+                  <Save className="mr-2 h-4 w-4" />
+                  Enregistrer
+                </Button>
+              </div>
             </form>
           </Form>
         </CardContent>
@@ -299,5 +317,3 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
     </>
   );
 }
-
-    
