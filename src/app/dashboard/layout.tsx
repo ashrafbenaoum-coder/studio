@@ -51,7 +51,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (user) {
-      user.getIdTokenResult().then((idTokenResult) => {
+      user.getIdTokenResult(true).then((idTokenResult) => {
         const role = (idTokenResult.claims.role as string) || "Viewer";
         setUserRole(role);
       });
