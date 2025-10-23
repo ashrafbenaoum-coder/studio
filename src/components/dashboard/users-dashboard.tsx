@@ -135,16 +135,12 @@ export function UsersDashboard() {
     
     toast({
       title: "Rôle mis à jour",
-      description: `Le rôle de l'utilisateur ${userToEdit.email.split('@')[0]} a été défini sur ${userToEdit.role}.`,
+      description: `Le rôle de l'utilisateur ${userToEdit.email} a été défini sur ${userToEdit.role}.`,
     });
 
     setEditUserDialogOpen(false);
     setUserToEdit(null);
   };
-  
-  const formatUsername = (email: string) => {
-    return email.split('@')[0];
-  }
 
   return (
     <div className="space-y-6">
@@ -172,8 +168,8 @@ export function UsersDashboard() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                      <div className="space-y-2">
-                        <Label htmlFor="email">Utilisateur</Label>
-                        <Input id="email" name="email" type="text" value={newUserData.email} onChange={handleInputChange} required />
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" name="email" type="email" value={newUserData.email} onChange={handleInputChange} required />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="password">Mot de passe</Label>
@@ -203,7 +199,7 @@ export function UsersDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Utilisateur</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -222,7 +218,7 @@ export function UsersDashboard() {
               ) : (
                 userProfiles?.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{formatUsername(user.email)}</TableCell>
+                    <TableCell className="font-medium">{user.email}</TableCell>
                     <TableCell>{user.role}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -261,7 +257,7 @@ export function UsersDashboard() {
              <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-email">Utilisateur</Label>
-                <Input id="edit-email" name="email" type="text" value={formatUsername(userToEdit.email)} disabled />
+                <Input id="edit-email" name="email" type="text" value={userToEdit.email} disabled />
               </div>
               <div className="space-y-2">
                   <Label htmlFor="edit-role">Rôle</Label>
@@ -290,7 +286,7 @@ export function UsersDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est une simulation. Dans une application réelle, elle supprimerait l'utilisateur "{userToDelete ? formatUsername(userToDelete.email) : ''}" de façon permanente.
+              Cette action est une simulation. Dans une application réelle, elle supprimerait l'utilisateur "{userToDelete ? userToDelete.email : ''}" de façon permanente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

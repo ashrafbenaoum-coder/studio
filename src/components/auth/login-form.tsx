@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
 
 const formSchema = z.object({
-  login: z.string().min(1, "Login est requis."),
+  email: z.string().email("L'adresse e-mail n'est pas valide."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -43,7 +43,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      login: "",
+      email: "",
       password: "",
     },
   });
@@ -57,19 +57,11 @@ export function LoginForm() {
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
     try {
-      const firestore = getFirestore(auth.app);
-      const loginRef = doc(firestore, "logins", values.login.toLowerCase());
-      const loginDoc = await getDoc(loginRef);
-
-      if (!loginDoc.exists()) {
-        throw new Error("login-not-found");
-      }
-
-      const email = loginDoc.data().email;
-      const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const loggedInUser = userCredential.user;
 
-      if (loggedInUser && values.login.toLowerCase() === "gds") {
+      if (loggedInUser && values.email.toLowerCase() === "gds@gds.com") {
+        const firestore = getFirestore(auth.app);
         const userDocRef = doc(firestore, "users", loggedInUser.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -80,16 +72,16 @@ export function LoginForm() {
           });
           toast({
             title: "Compte Administrateur Initialisé",
-            description: "Le rôle d'administrateur a été assigné à 'gds'.",
+            description: "Le rôle d'administrateur a été assigné à 'gds@gds.com'.",
           });
         }
       }
 
     } catch (error: any) {
-      console.error("Login error:", error);
+      console.error("Login error:", error.code);
       const message =
-        error.code === "auth/wrong-password" || error.code === 'auth/invalid-credential' || error.message === "login-not-found"
-          ? "Login ou mot de passe incorrect."
+        error.code === "auth/wrong-password" || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential'
+          ? "L'e-mail ou le mot de passe est incorrect."
           : "Une erreur de connexion s'est produite.";
 
       setLoginError(message);
@@ -124,12 +116,12 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
             <FormField
               control={form.control}
-              name="login"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Login</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} />
+                    <Input type="email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -140,7 +132,7 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Mot de passe</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
