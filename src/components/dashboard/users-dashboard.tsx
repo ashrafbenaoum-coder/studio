@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { useFirestore, useUser, useMemoFirebase, useDoc } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
@@ -126,7 +126,7 @@ export function UsersDashboard() {
         </CardHeader>
         <CardContent>
           <div className="text-center text-muted-foreground py-12">
-            mkybansh lya hna les utilisateur li kancree
+            La gestion des utilisateurs existants se fait désormais via la console Firebase pour plus de sécurité.
           </div>
         </CardContent>
       </Card>
