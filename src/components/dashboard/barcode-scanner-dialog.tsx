@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -61,7 +62,7 @@ export function BarcodeScannerDialog({
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: "environment",
+            facingMode: { exact: "environment" },
             width: { ideal: 1920 },
             height: { ideal: 1080 },
           },
