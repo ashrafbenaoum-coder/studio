@@ -56,68 +56,65 @@ export function LoginForm() {
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
+    const firestore = getFirestore(auth.app);
+    const loginUsername = values.login.toLowerCase();
+    const loginRef = doc(firestore, "logins", loginUsername);
+    const gdsEmail = "gds@gds.com";
+
     try {
-      const firestore = getFirestore(auth.app);
-      const loginRef = doc(firestore, "logins", values.login.toLowerCase());
-      const loginDoc = await getDoc(loginRef);
       let email;
 
-      if (!loginDoc.exists()) {
-        // Cas spécial pour l'admin "gds" : on le crée s'il n'existe pas
-        if (values.login.toLowerCase() === "gds") {
-          email = "gds@gds.com";
-          try {
-            // Tenter de créer l'utilisateur
-            const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
-            
-            // Créer le document de login et le profil utilisateur
-            await setDoc(loginRef, { email: email });
-            const userDocRef = doc(firestore, "users", userCredential.user.uid);
-            await setDoc(userDocRef, {
-              email: userCredential.user.email,
-              role: "Administrator",
-              displayName: "GDS Admin"
-            });
-            toast({
-              title: "Compte Administrateur Créé",
-              description: "Le compte 'gds' a été initialisé avec succès.",
-            });
-             // La connexion est déjà faite par createUserWithEmailAndPassword, on peut sortir
-             setIsSubmitting(false);
-             return;
-          } catch (error: any) {
-            // Si l'utilisateur existe déjà, on tente de se connecter
-            if (error.code === 'auth/email-already-in-use') {
-              // L'utilisateur existe, on continue pour tenter la connexion normale
-            } else {
-              throw error; // Lancer une autre erreur
-            }
-          }
-        } else {
+      if (loginUsername === "gds") {
+        email = gdsEmail;
+      } else {
+        const loginDoc = await getDoc(loginRef);
+        if (!loginDoc.exists()) {
           throw new Error("login-not-found");
         }
+        email = loginDoc.data().email;
       }
-      
-      // Si on arrive ici, soit le login existe, soit c'est l'admin qui existait déjà
-      email = loginDoc.exists() ? loginDoc.data().email : "gds@gds.com";
+
       await signInWithEmailAndPassword(auth, email, values.password);
-      
       toast({
         title: "Connexion réussie",
         description: `Bienvenue ${values.login}`,
       });
 
     } catch (error: any) {
-      const message =
-        error.code === "auth/wrong-password" || error.code === "auth/invalid-credential" || error.message === "login-not-found"
-          ? "Login ou mot de passe incorrect."
-          : "Une erreur de connexion s'est produite.";
-      
-      toast({
-        variant: "destructive",
-        title: "Erreur de connexion",
-        description: message,
-      });
+      if (loginUsername === "gds" && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
+        // L'utilisateur admin 'gds' n'existe pas, on le crée
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, gdsEmail, values.password);
+          await setDoc(loginRef, { email: gdsEmail });
+          const userDocRef = doc(firestore, "users", userCredential.user.uid);
+          await setDoc(userDocRef, {
+            email: userCredential.user.email,
+            role: "Administrator",
+            displayName: "GDS Admin"
+          });
+          toast({
+            title: "Compte Administrateur Créé",
+            description: "Le compte 'gds' a été initialisé avec succès.",
+          });
+        } catch (creationError: any) {
+           toast({
+            variant: "destructive",
+            title: "Erreur de création",
+            description: "Impossible de créer le compte administrateur.",
+          });
+        }
+      } else {
+         const message =
+          error.code === "auth/wrong-password" || error.message === "login-not-found"  || error.code === "auth/invalid-credential"
+            ? "Login ou mot de passe incorrect."
+            : "Une erreur de connexion s'est produite.";
+        
+        toast({
+          variant: "destructive",
+          title: "Erreur de connexion",
+          description: message,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
