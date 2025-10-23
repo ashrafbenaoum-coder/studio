@@ -5,8 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { format, parse } from "date-fns";
-import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus, Calculator } from "lucide-react";
+import { MapPin, Barcode, Package, Calendar as CalendarIcon, Save, Camera, Plus, Minus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,18 +24,32 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 import { BarcodeScannerDialog } from "./barcode-scanner-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CalculatorPopover } from "./calculator-popover";
 
 const formSchema = z.object({
-  address: z.string().regex(/^A-\d{3}-\d{4}-\d{2}$/, "Le format de l'adresse doit être A-XXX-XXXX-XX."),
+  address: z.string().regex(/^([A-Z])-\d{3}-\d{4}-\d{2}$/, "Le format de l'adresse doit être A-XXX-XXXX-XX."),
   barcode: z.string().min(1, "Code barre est requis."),
   quantity: z.coerce.number().min(0, "La quantité ne peut pas être négative."),
   expirationDate: z.string().regex(/^\d{8}$/, "La date doit être au format YYYYMMDD."),
 });
+
+const pickingRanges: Record<string, { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; }> = {
+    A1: {
+      impairStart: "A-001-0001-00",
+      impairEnd: "A-001-0205-00",
+      pairStart: "A-001-0200-00",
+      pairEnd: "A-001-0002-00",
+    },
+    B5: {
+      impairStart: "B-005-0001-00",
+      impairEnd: "B-005-0205-00",
+      pairStart: "B-005-0200-00",
+      pairEnd: "B-005-0002-00",
+    },
+};
 
 type InventoryFormProps = {
   onAddProduct: (product: Omit<Product, "id" | "storeId" | "aisleId">) => void;
@@ -45,19 +58,72 @@ type InventoryFormProps = {
 export function InventoryForm({ onAddProduct }: InventoryFormProps) {
   const { toast } = useToast();
   const [isScannerOpen, setScannerOpen] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      address: "",
+      address: "A-001-0001-00", 
       barcode: "",
       quantity: 0,
       expirationDate: "",
     },
   });
 
+  function getNextAddress(current: string, rayonKey: string): string | null {
+    const range = pickingRanges[rayonKey];
+    if (!range) return null;
+  
+    const parts = current.split('-');
+    if (parts.length !== 4) return null; 
+
+    const prefix = parts[0];
+    const section = parts[1];
+    let location = parseInt(parts[2], 10);
+    const level = parts[3];
+
+    if (isNaN(location)) return null;
+
+    if (location % 2 !== 0 ) { // Impair
+        if (current === range.impairEnd) return null;
+        location += 2;
+    } else { // Pair
+        if (current === range.pairEnd) return null;
+        location -= 2;
+    }
+  
+    return `${prefix}-${section}-${location.toString().padStart(4, "0")}-${level}`;
+  }
+  
   function onSubmit(values: z.infer<typeof formSchema>) {
     onAddProduct(values);
-    form.reset();
+  
+    const addressPrefix = values.address.substring(0, 5); // e.g., "A-001"
+    
+    const rayonKey = Object.keys(pickingRanges).find((key) => {
+        const range = pickingRanges[key];
+        return range.impairStart.startsWith(addressPrefix.substring(0,1)) && range.impairStart.includes(`-${addressPrefix.substring(2,5)}-`);
+    });
+
+    if (rayonKey) {
+      const nextAddress = getNextAddress(values.address, rayonKey);
+      if (nextAddress) {
+        form.reset({
+          ...values,
+          address: nextAddress,
+          barcode: "", 
+          quantity: 0, 
+          expirationDate: "" 
+        });
+      } else {
+        toast({
+          title: "Fin du rayon",
+          description: "Toutes les adresses de ce chemin ont été utilisées.",
+        });
+        form.reset({ address: "", barcode: "", quantity: 0, expirationDate: ""});
+      }
+    } else {
+        form.reset({ address: "", barcode: "", quantity: 0, expirationDate: ""});
+    }
   }
 
   const handleBarcodeScan = (result: string | null) => {
@@ -93,7 +159,7 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
                       <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <FormControl>
                         <Input
-                          placeholder="Ex: A-001-0001-01"
+                          placeholder="Ex: A-001-0001-00"
                           {...field}
                           className="pl-10"
                         />
@@ -219,3 +285,5 @@ export function InventoryForm({ onAddProduct }: InventoryFormProps) {
     </>
   );
 }
+
+    
