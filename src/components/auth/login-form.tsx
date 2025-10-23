@@ -79,7 +79,6 @@ export function LoginForm() {
       }
 
     } catch (error: any) {
-      console.error("Login error:", error.code);
       const message =
         error.code === "auth/wrong-password" || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential'
           ? "Utilisateur ou mot de passe incorrect."
