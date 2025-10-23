@@ -201,9 +201,11 @@ export default function DashboardLayout({
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
-                <DropdownMenuItem disabled={!isAdmin}>
+                <DropdownMenuItem asChild disabled={!isAdmin}>
+                  <Link href={isAdmin ? "/dashboard/users" : "#"}>
                     <Users className="mr-2 h-4 w-4" />
                     <span>Gérer les utilisateurs</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                     <KeyRound className="mr-2 h-4 w-4" />

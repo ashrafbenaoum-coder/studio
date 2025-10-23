@@ -1,0 +1,154 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Plus, UserPlus, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Mock data for now
+const mockUsers = [
+  { id: "1", email: "user1@example.com", role: "Viewer" },
+  { id: "2", email: "user2@example.com", role: "Editor" },
+];
+
+export function UsersDashboard() {
+  const { toast } = useToast();
+  const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
+
+  const handleCreateUser = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    
+    // TODO: Implement actual user creation with Firebase Admin SDK
+    console.log("Creating user:", { email, password });
+    
+    toast({
+      title: "Utilisateur créé (Simulation)",
+      description: `L'utilisateur ${email} a été ajouté avec succès.`,
+    });
+    setAddUserDialogOpen(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Gérer les utilisateurs</CardTitle>
+            <CardDescription>
+              Ajoutez, supprimez ou modifiez les utilisateurs et leurs permissions.
+            </CardDescription>
+          </div>
+          <Dialog open={isAddUserDialogOpen} onOpenChange={setAddUserDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="mr-2" />
+                Ajouter un utilisateur
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
+                <DialogDescription>
+                  Entrez les informations pour créer un nouveau compte.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateUser} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Adresse e-mail</Label>
+                  <Input id="email" name="email" type="email" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Mot de passe</Label>
+                  <Input id="password" name="password" type="password" required />
+                </div>
+                {/* TODO: Add role/permission selection here */}
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="ghost">
+                      Annuler
+                    </Button>
+                  </DialogClose>
+                  <Button type="submit">Créer l'utilisateur</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Adresse e-mail</TableHead>
+                <TableHead>Rôle</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mockUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.email}</TableCell>
+                  <TableCell>{user.role}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Edit className="mr-2 h-4 w-4" />
+                          <span>Modifier</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Supprimer</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
