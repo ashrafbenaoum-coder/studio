@@ -35,11 +35,23 @@ import {
   useFirestore,
   useUser,
   useMemoFirebase,
-  addDocumentNonBlocking,
+  setDocumentNonBlocking,
   useDoc,
+  FirestorePermissionError,
+  errorEmitter
 } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, getDocs } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+
 
 export function UsersDashboard() {
   const { toast } = useToast();
@@ -53,11 +65,43 @@ export function UsersDashboard() {
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = useMemo(() => adminProfile?.role === "Administrator", [adminProfile]);
 
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     role: "Viewer" as "Administrator" | "Viewer",
   });
+  
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (isAdmin && firestore) {
+        setIsLoadingUsers(true);
+        const usersCollectionRef = collection(firestore, 'users');
+        try {
+            const querySnapshot = await getDocs(usersCollectionRef);
+            const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+            setUsers(usersList);
+        } catch (serverError) {
+          const permissionError = new FirestorePermissionError({
+            path: usersCollectionRef.path,
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          console.error("Permission error fetching users:", permissionError.message);
+        } finally {
+            setIsLoadingUsers(false);
+        }
+      } else {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    if (!isAdminLoading) {
+        fetchUsers();
+    }
+  }, [isAdmin, firestore, isAdminLoading]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -78,17 +122,24 @@ export function UsersDashboard() {
         return;
     }
     const usersCollectionRef = collection(firestore, "users");
+    // Create a reference for a new document to get a unique ID
+    const newUserRef = doc(usersCollectionRef);
     
-    // This adds user data to Firestore, but authentication must be handled in the Firebase Console.
-    addDocumentNonBlocking(usersCollectionRef, {
+    const userData = {
       email: `${newUserData.email}@gds.com`,
       role: newUserData.role,
-    });
+    };
     
+    // Use the generated ID to set the document
+    setDocumentNonBlocking(newUserRef, userData, {});
+
     toast({
       title: "Profil créé dans Firestore",
-      description: `N'oubliez pas de créer un compte d'authentification pour ${newUserData.email}@gds.com dans la console Firebase.`,
+      description: `N'oubliez pas de créer un compte d'authentification pour ${userData.email} dans la console Firebase.`,
     });
+    
+    // Optimistically update the UI
+    setUsers(prevUsers => [...prevUsers, { id: newUserRef.id, ...userData }]);
     
     setAddUserDialogOpen(false);
     setNewUserData({ email: "", role: "Viewer" });
@@ -192,9 +243,40 @@ export function UsersDashboard() {
           </Dialog>
         </CardHeader>
         <CardContent>
-           <div className="text-center text-muted-foreground py-12">
-             La gestion des utilisateurs (création de compte, suppression, etc.) se fait désormais via la console Firebase pour plus de sécurité.
-           </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rôle</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingUsers ? (
+                  <TableRow>
+                    <TableCell colSpan={2} className="h-24 text-center">
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                    </TableCell>
+                  </TableRow>
+                ) : users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={2} className="h-24 text-center">
+                      Aucun utilisateur trouvé.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'Administrator' ? 'default' : 'secondary'}>
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
         </CardContent>
       </Card>
     </div>

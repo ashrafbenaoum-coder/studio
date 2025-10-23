@@ -1,109 +1,96 @@
+/**
+ * @fileoverview Firestore Security Rules for Inventory Management App
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model. Users can only read and write data
+ * (stores, aisles, products) that they explicitly own. All data is nested under
+ * /users/{userId}, providing clear ownership boundaries.
+ *
+ * Data Structure:
+ * The Firestore data structure is hierarchical: /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}.
+ * This structure reflects the ownership model, with each level inheriting the user's ownership.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own data, ensuring data privacy and preventing unauthorized access.
+ * - The root `/users` collection is not listable, preventing enumeration of users.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @returns {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user ID matches, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user owns the existing document
-     *              at the current path (resource).  Must be used for update/delete
-     *              operations to ensure the document exists and the user owns it.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user owns the document, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isSignedIn() && isOwner(userId) && resource.data != null;
-    }
-
-    /**
-     * @description Rule set for user profile documents.
-     * @path /users/{userId}
-     * @allow (create) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create their own profile.
-     * @allow (get) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can retrieve their own profile.
-     * @allow (update) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update their own profile.
-     * @allow (delete) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete their own profile.
-     * @deny (create) - User 'anotherUser' cannot create a profile for user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @deny (get) - User 'anotherUser' cannot retrieve the profile of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @principle Enforces document ownership for all operations on user profiles.
+     * @description Allows users to read and write their own profile data.
+     * @path /databases/{database}/documents/users/{userId}
+     * @allow (get, create, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can access /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1 (all operations).
+     * @deny (get, create, update, delete) User 'attackerId' cannot access /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1.
+     * @principle Enforces document ownership for all writes; validates user ID on create.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow list: if false; // Prevent user enumeration
+      allow create: if isOwner(userId) && request.resource.data.email is string;
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rule set for store documents.
-     * @path /users/{userId}/stores/{storeId}
-     * @allow (create) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create a store under their profile.
-     * @allow (get) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can retrieve a store under their profile.
-     * @allow (update) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update a store under their profile.
-     * @allow (delete) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete a store under their profile.
-     * @deny (create) - User 'anotherUser' cannot create a store for user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @deny (get) - User 'anotherUser' cannot retrieve a store of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @principle Enforces document ownership for all operations on store documents.
+     * @description Allows users to manage their own stores.
+     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create a store under /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1/stores/newStoreId.
+     * @allow (get, list, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can access their own store.
+     * @deny (create, get, list, update, delete) User 'attackerId' cannot access the store.
+     * @principle Enforces user-ownership for store management.
      */
     match /users/{userId}/stores/{storeId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rule set for aisle documents.
-     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}
-     * @allow (create) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create an aisle under their store.
-     * @allow (get) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can retrieve an aisle under their store.
-     * @allow (update) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update an aisle under their store.
-     * @allow (delete) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete an aisle under their store.
-     * @deny (create) - User 'anotherUser' cannot create an aisle for user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @deny (get) - User 'anotherUser' cannot retrieve an aisle of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @principle Enforces document ownership for all operations on aisle documents.
+     * @description Allows users to manage aisles within their stores.
+     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}/aisles/{aisleId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create aisles in their stores.
+     * @allow (get, list, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can access aisles in their stores.
+     * @deny (create, get, list, update, delete) User 'attackerId' cannot access the aisles.
+     * @principle Enforces user-ownership for aisle management.
      */
     match /users/{userId}/stores/{storeId}/aisles/{aisleId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rule set for product documents.
-     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
-     * @allow (create) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create a product under their aisle.
-     * @allow (get) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can retrieve a product under their aisle.
-     * @allow (update) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can update a product under their aisle.
-     * @allow (delete) - User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can delete a product under their aisle.
-     * @deny (create) - User 'anotherUser' cannot create a product for user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @deny (get) - User 'anotherUser' cannot retrieve a product of user 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1'.
-     * @principle Enforces document ownership for all operations on product documents.
+     * @description Allows users to manage products within their store aisles.
+     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
+     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create products in their aisles.
+     * @allow (get, list, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can manage their products.
+     * @deny (create, get, list, update, delete) User 'attackerId' cannot access the products.
+     * @principle Enforces user-ownership for product management.
      */
     match /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId} {
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+      }
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
   }
 }
