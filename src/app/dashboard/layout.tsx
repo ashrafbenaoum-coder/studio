@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sun, Moon, Monitor, LogOut, FileDown, Users } from "lucide-react";
+import { useTheme } from "next-themes";
 
 
 export default function DashboardLayout({
@@ -30,6 +31,7 @@ export default function DashboardLayout({
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -104,15 +106,15 @@ export default function DashboardLayout({
                   </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("light")}>
                         <Sun className="mr-2 h-4 w-4" />
                         <span>Clair</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("dark")}>
                         <Moon className="mr-2 h-4 w-4" />
                         <span>Sombre</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("system")}>
                         <Monitor className="mr-2 h-4 w-4" />
                         <span>Système</span>
                       </DropdownMenuItem>
