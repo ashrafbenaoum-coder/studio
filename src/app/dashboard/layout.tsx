@@ -7,6 +7,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/logo";
 import Link from "next/link";
@@ -14,6 +19,8 @@ import { useAuth, useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sun, Moon, Monitor, LogOut, FileDown, Users } from "lucide-react";
+
 
 export default function DashboardLayout({
   children,
@@ -85,8 +92,41 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <FileDown className="mr-2 h-4 w-4" />
+                  <span>Exporter les fichiers</span>
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                     <Sun className="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                     <Moon className="absolute mr-2 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                    <span>Thème</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem>
+                        <Sun className="mr-2 h-4 w-4" />
+                        <span>Clair</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Moon className="mr-2 h-4 w-4" />
+                        <span>Sombre</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Monitor className="mr-2 h-4 w-4" />
+                        <span>Système</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+                <DropdownMenuItem disabled>
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>Gérer les utilisateurs</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
-                  Logout
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Se déconnecter</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
