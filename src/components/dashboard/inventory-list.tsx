@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import type { Product } from "@/lib/types";
 import { getStatus } from "@/lib/utils";
 import {
@@ -67,6 +67,11 @@ export function InventoryList({
   const [isDeleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+
+  const sortedProducts = useMemo(() => {
+    if (!products) return [];
+    return [...products].sort((a, b) => a.address.localeCompare(b.address));
+  }, [products]);
 
   const handleExport = () => {
     if (products.length === 0) {
@@ -234,8 +239,8 @@ export function InventoryList({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Produit (Code Barre)</TableHead>
                   <TableHead>Adresse</TableHead>
+                  <TableHead>Produit (Code Barre)</TableHead>
                   <TableHead className="text-center">Quantité</TableHead>
                   <TableHead>Date d'exp.</TableHead>
                   <TableHead>Statut</TableHead>
@@ -249,19 +254,19 @@ export function InventoryList({
                       <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                     </TableCell>
                   </TableRow>
-                ) : products.length === 0 ? (
+                ) : sortedProducts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       Aucun produit dans l'inventaire.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  products.map((product) => {
+                  sortedProducts.map((product) => {
                     const status = getStatus(product.expirationDate);
                     return (
                       <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.barcode}</TableCell>
-                        <TableCell>{product.address}</TableCell>
+                        <TableCell className="font-medium">{product.address}</TableCell>
+                        <TableCell>{product.barcode}</TableCell>
                         <TableCell className="text-center">{product.quantity}</TableCell>
                         <TableCell>{product.expirationDate}</TableCell>
                         <TableCell>
