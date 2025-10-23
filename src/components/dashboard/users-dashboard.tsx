@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFirebase, useDoc } from "@/firebase";
+import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
@@ -72,13 +72,12 @@ export function UsersDashboard() {
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = adminProfile?.role === 'Administrator';
 
-
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setEditUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [userToEdit, setUserToEdit] = useState<UserProfile | null>(null);
   
-  const [newUserData, setNewUserData] = useState({ email: '', password: '', role: 'Viewer' as 'Administrator' | 'Viewer'});
+  const [newUserData, setNewUserData] = useState({ login: '', password: '', role: 'Viewer' as 'Administrator' | 'Viewer'});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -88,15 +87,23 @@ export function UsersDashboard() {
   const handleRoleChange = (value: 'Administrator' | 'Viewer') => {
     setNewUserData(prev => ({ ...prev, role: value }));
   };
+  
+  const getUsername = (email: string) => {
+    return email.split('@')[0];
+  };
 
   const handleCreateUser = () => {
     toast({
       title: "Création (Simulation)",
-      description: `Dans une application réelle, l'utilisateur ${newUserData.email} serait créé.`,
+      description: `Dans une application réelle, l'utilisateur avec le login '${newUserData.login}' serait créé.`,
     });
-    console.log("Simulating creation of user:", newUserData);
+    console.log("Simulating creation of user:", {
+        email: `${newUserData.login}@gds.com`,
+        password: newUserData.password,
+        role: newUserData.role,
+    });
     setAddUserDialogOpen(false);
-    setNewUserData({ email: '', password: '', role: 'Viewer' });
+    setNewUserData({ login: '', password: '', role: 'Viewer' });
   };
   
   const openDeleteConfirm = (user: UserProfile) => {
@@ -115,7 +122,7 @@ export function UsersDashboard() {
     if (userToDelete) {
       toast({
         title: "Suppression (Simulation)",
-        description: `Dans une application réelle, l'utilisateur ${userToDelete.email} serait supprimé.`,
+        description: `Dans une application réelle, l'utilisateur ${getUsername(userToDelete.email)} serait supprimé.`,
       });
       console.log(`Simulating deletion of user: ${userToDelete.email}`);
       setUserToDelete(null);
@@ -135,7 +142,7 @@ export function UsersDashboard() {
     
     toast({
       title: "Rôle mis à jour",
-      description: `Le rôle de l'utilisateur ${userToEdit.email} a été défini sur ${userToEdit.role}.`,
+      description: `Le rôle de l'utilisateur ${getUsername(userToEdit.email)} a été défini sur ${userToEdit.role}.`,
     });
 
     setEditUserDialogOpen(false);
@@ -168,8 +175,8 @@ export function UsersDashboard() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" name="email" type="email" value={newUserData.email} onChange={handleInputChange} required />
+                        <Label htmlFor="login">Utilisateur</Label>
+                        <Input id="login" name="login" type="text" value={newUserData.login} onChange={handleInputChange} required />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="password">Mot de passe</Label>
@@ -199,7 +206,7 @@ export function UsersDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Email</TableHead>
+                <TableHead>Utilisateur</TableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -218,7 +225,7 @@ export function UsersDashboard() {
               ) : (
                 userProfiles?.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.email}</TableCell>
+                    <TableCell className="font-medium">{getUsername(user.email)}</TableCell>
                     <TableCell>{user.role}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -256,8 +263,8 @@ export function UsersDashboard() {
           {userToEdit && (
              <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Utilisateur</Label>
-                <Input id="edit-email" name="email" type="text" value={userToEdit.email} disabled />
+                <Label htmlFor="edit-login">Utilisateur</Label>
+                <Input id="edit-login" name="login" type="text" value={getUsername(userToEdit.email)} disabled />
               </div>
               <div className="space-y-2">
                   <Label htmlFor="edit-role">Rôle</Label>
@@ -286,7 +293,7 @@ export function UsersDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est une simulation. Dans une application réelle, elle supprimerait l'utilisateur "{userToDelete ? userToDelete.email : ''}" de façon permanente.
+              Cette action est une simulation. Dans une application réelle, elle supprimerait l'utilisateur "{userToDelete ? getUsername(userToDelete.email) : ''}" de façon permanente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

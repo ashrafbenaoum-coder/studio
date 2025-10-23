@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
 
 const formSchema = z.object({
-  email: z.string().email("L'adresse e-mail n'est pas valide."),
+  login: z.string().min(1, "Utilisateur est requis."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -43,7 +43,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      login: "",
       password: "",
     },
   });
@@ -57,10 +57,11 @@ export function LoginForm() {
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      const email = values.login.includes('@') ? values.login : `${values.login}@gds.com`;
+      const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
       const loggedInUser = userCredential.user;
 
-      if (loggedInUser && values.email.toLowerCase() === "gds@gds.com") {
+      if (loggedInUser && values.login.toLowerCase() === "gds") {
         const firestore = getFirestore(auth.app);
         const userDocRef = doc(firestore, "users", loggedInUser.uid);
         const userDoc = await getDoc(userDocRef);
@@ -72,7 +73,7 @@ export function LoginForm() {
           });
           toast({
             title: "Compte Administrateur Initialisé",
-            description: "Le rôle d'administrateur a été assigné à 'gds@gds.com'.",
+            description: "Le rôle d'administrateur a été assigné à 'gds'.",
           });
         }
       }
@@ -81,7 +82,7 @@ export function LoginForm() {
       console.error("Login error:", error.code);
       const message =
         error.code === "auth/wrong-password" || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential'
-          ? "L'e-mail ou le mot de passe est incorrect."
+          ? "Utilisateur ou mot de passe incorrect."
           : "Une erreur de connexion s'est produite.";
 
       setLoginError(message);
@@ -116,12 +117,12 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
             <FormField
               control={form.control}
-              name="email"
+              name="login"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Utilisateur</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} />
+                    <Input type="text" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
