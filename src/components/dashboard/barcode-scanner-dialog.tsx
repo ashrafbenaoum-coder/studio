@@ -1,11 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import {
-  MultiFormatReader,
-  BarcodeFormat,
-  DecodeHintType,
-} from "@zxing/library";
+import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
 import {
   Dialog,
   DialogContent,
@@ -30,78 +26,78 @@ export function BarcodeScannerDialog({
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
-  const readerRef = useRef<MultiFormatReader | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const codeReader = useRef<BrowserMultiFormatReader | null>(null);
 
   useEffect(() => {
-    if (!readerRef.current) {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
-        BarcodeFormat.QR_CODE,
-      ]);
-      const reader = new MultiFormatReader();
-      reader.setHints(hints);
-      readerRef.current = reader;
+    if (!codeReader.current) {
+      codeReader.current = new BrowserMultiFormatReader();
     }
 
+    const reader = codeReader.current;
+    let stream: MediaStream;
+
     const startScanner = async () => {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast({
-          variant: "destructive",
-          title: "Caméra non supportée",
-          description: "Votre navigateur ne supporte pas l'accès à la caméra.",
-        });
-        onOpenChange(false);
-        return;
-      }
+      if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
+        const videoInputDevices = await reader.listVideoInputDevices();
+        if (videoInputDevices.length === 0) {
+            setHasCameraPermission(false);
+            toast({ variant: "destructive", title: "Aucune caméra trouvée"});
+            onOpenChange(false);
+            return;
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
             facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            deviceId: videoInputDevices[0].deviceId
           },
         });
-
         setHasCameraPermission(true);
-        streamRef.current = stream;
 
-        if (!videoRef.current) return;
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
 
-        readerRef.current?.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
-          if (result) {
-            onScan(result.getText());
-            onOpenChange(false);
-            readerRef.current?.reset();
-          }
-        });
+          reader.decodeFromStream(stream, videoRef.current, (result, error) => {
+            if (result) {
+              onScan(result.getText());
+              onOpenChange(false);
+            }
+            if (error && !(error instanceof NotFoundException)) {
+                console.error(error);
+            }
+          });
+        }
       } catch (error: any) {
         setHasCameraPermission(false);
-        toast({
-          variant: "destructive",
-          title: "Erreur de caméra",
-          description:
-            error.name === "NotAllowedError"
-              ? "Accès à la caméra refusé. Autorisez-le dans les paramètres du navigateur."
-              : "Impossible d'accéder à la caméra. Vérifiez les permissions ou réessayez.",
-        });
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          toast({
+            variant: "destructive",
+            title: "Accès à la caméra refusé",
+            description: "Veuillez autoriser l'accès à la caméra dans les paramètres.",
+          });
+        } else {
+          console.error("Erreur de caméra inattendue:", error);
+          toast({
+            variant: "destructive",
+            title: "Erreur de caméra",
+            description: "Impossible d'accéder à la caméra.",
+          });
+        }
         onOpenChange(false);
       }
     };
 
     const stopScanner = () => {
-      readerRef.current?.reset();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      if (videoRef.current) videoRef.current.srcObject = null;
+      reader.reset();
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     };
 
     if (open) {
@@ -110,8 +106,10 @@ export function BarcodeScannerDialog({
       stopScanner();
     }
 
-    return () => stopScanner();
-  }, [open, onScan, onOpenChange, toast]);
+    return () => {
+      stopScanner();
+    };
+  }, [open, onOpenChange, onScan, toast]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
