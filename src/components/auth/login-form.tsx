@@ -34,8 +34,8 @@ const formSchema = z.object({
 
 const hardcodedFirebaseEmail = "gds@gds.com";
 const hardcodedFirebasePassword = "gdsidl";
-const requiredUsername = "GDS";
-const requiredPassword = "gdsidl";
+const requiredUsername = "login";
+const requiredPassword = "login";
 
 export function LoginForm() {
   const router = useRouter();
