@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
+import {
+  BrowserMultiFormatReader,
+  BarcodeFormat,
+  DecodeHintType,
+} from "@zxing/library";
 import {
   Dialog,
   DialogContent,
@@ -31,29 +35,38 @@ export function BarcodeScannerDialog({
 
   useEffect(() => {
     if (!codeReader.current) {
-      codeReader.current = new BrowserMultiFormatReader();
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.ITF,
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.PDF_417,
+        BarcodeFormat.AZTEC,
+      ]);
+      codeReader.current = new BrowserMultiFormatReader(hints);
     }
 
     const reader = codeReader.current;
 
     const startScanner = async () => {
-      if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
 
       try {
-        const videoInputDevices = await reader.listVideoInputDevices();
-        if (videoInputDevices.length === 0) {
-            setHasCameraPermission(false);
-            toast({ variant: "destructive", title: "Aucune caméra trouvée"});
-            onOpenChange(false);
-            return;
-        }
-
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
+          video: {
             facingMode: "environment",
-            deviceId: videoInputDevices[0].deviceId
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           },
         });
+
         setHasCameraPermission(true);
         streamRef.current = stream;
 
@@ -61,32 +74,31 @@ export function BarcodeScannerDialog({
           videoRef.current.srcObject = stream;
           videoRef.current.play();
 
-          reader.decodeFromStream(stream, videoRef.current, (result, error) => {
+          reader.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
             if (result) {
               onScan(result.getText());
               onOpenChange(false);
-            }
-            if (error && !(error instanceof NotFoundException)) {
-                console.error(error);
+              reader.reset();
             }
           });
         }
       } catch (error: any) {
         setHasCameraPermission(false);
+
         if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
           toast({
             variant: "destructive",
             title: "Accès à la caméra refusé",
-            description: "Veuillez autoriser l'accès à la caméra dans les paramètres.",
+            description: "Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur.",
           });
         } else {
-          console.error("Erreur de caméra inattendue:", error);
           toast({
             variant: "destructive",
             title: "Erreur de caméra",
-            description: "Impossible d'accéder à la caméra.",
+            description: "Impossible d'accéder à la caméra. Vérifiez les permissions ou réessayez.",
           });
         }
+
         onOpenChange(false);
       }
     };
@@ -108,10 +120,8 @@ export function BarcodeScannerDialog({
       stopScanner();
     }
 
-    return () => {
-      stopScanner();
-    };
-  }, [open, onOpenChange, onScan, toast]);
+    return () => stopScanner();
+  }, [open, onScan, onOpenChange, toast]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
