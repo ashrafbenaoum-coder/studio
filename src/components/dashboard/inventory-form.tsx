@@ -35,16 +35,20 @@ const formSchema = z.object({
   expirationDate: z.string().regex(/^\d{8}$/, "La date doit être au format YYYYMMDD."),
 });
 
-const pickingRanges: Record<string, { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; }> = {
-    A1: { impairStart: "A-001-0001-00", impairEnd: "A-001-0205-00", pairStart: "A-001-0200-00", pairEnd: "A-001-0002-00" },
-    A2: { impairStart: "A-002-0001-00", impairEnd: "A-002-0205-00", pairStart: "A-002-0200-00", pairEnd: "A-002-0002-00" },
-    A3: { impairStart: "A-003-0001-00", impairEnd: "A-003-0205-00", pairStart: "A-003-0200-00", pairEnd: "A-003-0002-00" },
-    A4: { impairStart: "A-004-0001-00", impairEnd: "A-004-0205-00", pairStart: "A-004-0200-00", pairEnd: "A-004-0002-00" },
-    B1: { impairStart: "B-001-0001-00", impairEnd: "B-001-0205-00", pairStart: "B-001-0200-00", pairEnd: "B-001-0002-00" },
-    B2: { impairStart: "B-002-0001-00", impairEnd: "B-002-0205-00", pairStart: "B-002-0200-00", pairEnd: "B-002-0002-00" },
-    B3: { impairStart: "B-003-0001-00", impairEnd: "B-003-0205-00", pairStart: "B-003-0200-00", pairEnd: "B-003-0002-00" },
-    B4: { impairStart: "B-004-0001-00", impairEnd: "B-004-0205-00", pairStart: "B-004-0200-00", pairEnd: "B-004-0002-00" },
-    B5: { impairStart: "B-005-0001-00", impairEnd: "B-005-0205-00", pairStart: "B-005-0200-00", pairEnd: "B-005-0002-00" },
+const generatePickingRange = (aisleName: string): { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; } | null => {
+    const match = aisleName.match(/^([A-Z])(\d+)$/);
+    if (!match) return null;
+
+    const prefix = match[1];
+    const sectionNumber = parseInt(match[2], 10);
+    const section = sectionNumber.toString().padStart(3, '0');
+
+    return {
+        impairStart: `${prefix}-${section}-0001-00`,
+        impairEnd: `${prefix}-${section}-0205-00`,
+        pairStart: `${prefix}-${section}-0200-00`,
+        pairEnd: `${prefix}-${section}-0002-00`,
+    };
 };
 
 type InventoryFormProps = {
@@ -57,10 +61,9 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
   const [isScannerOpen, setScannerOpen] = useState(false);
 
   const getInitialAddress = (name?: string) => {
-    if (name && pickingRanges[name]) {
-      return pickingRanges[name].impairStart;
-    }
-    return "";
+    if (!name) return "";
+    const range = generatePickingRange(name);
+    return range ? range.impairStart : "";
   };
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -83,7 +86,7 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
   }, [aisleName, form]);
 
   function getNextAddress(current: string, rayonKey: string): string | null {
-    const range = pickingRanges[rayonKey];
+    const range = generatePickingRange(rayonKey);
     if (!range) return null;
   
     const parts = current.split('-');
@@ -112,7 +115,7 @@ export function InventoryForm({ onAddProduct, aisleName }: InventoryFormProps) {
   
     const rayonKey = aisleName;
 
-    if (rayonKey && pickingRanges[rayonKey]) {
+    if (rayonKey) {
       const nextAddress = getNextAddress(values.address, rayonKey);
       if (nextAddress) {
         form.reset({
