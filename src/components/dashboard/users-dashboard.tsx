@@ -68,32 +68,14 @@ export function UsersDashboard() {
   const firestore = useFirestore();
   const { user: adminUser } = useUser(); // The currently logged-in admin
   
-  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Fetch all user profiles from Firestore
+  const usersCollectionRef = useMemoFirebase(() => collection(firestore, "users"), [firestore]);
+  const { data: userProfiles, isLoading: areUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   // Fetch the current admin's profile to check their role
   const adminProfileRef = useMemoFirebase(() => adminUser ? doc(firestore, 'users', adminUser.uid) : null, [adminUser, firestore]);
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
   const isAdmin = adminProfile?.role === 'Administrator';
-
-  // Fetch all user profiles from Firestore only if the user is an admin
-  const usersCollectionRef = useMemoFirebase(() => isAdmin ? collection(firestore, "users") : null, [isAdmin, firestore]);
-  const { data: allUsers, isLoading: areUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
-
-  useEffect(() => {
-    if (isAdmin) {
-      setIsLoading(areUsersLoading);
-      if(allUsers) {
-        setUserProfiles(allUsers);
-      }
-    } else {
-      // If not an admin, just show their own profile.
-      if (adminProfile) {
-        setUserProfiles([adminProfile]);
-      }
-      setIsLoading(false);
-    }
-  }, [adminProfile, allUsers, isAdmin, areUsersLoading]);
 
 
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
@@ -234,13 +216,13 @@ export function UsersDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {areUsersLoading ? (
                 <TableRow>
                   <TableCell colSpan={3} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                   </TableCell>
                 </TableRow>
-              ) : userProfiles.length === 0 ? (
+              ) : !userProfiles || userProfiles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground">Aucun utilisateur trouvé.</TableCell>
                 </TableRow>
@@ -327,3 +309,5 @@ export function UsersDashboard() {
     </div>
   );
 }
+
+    
