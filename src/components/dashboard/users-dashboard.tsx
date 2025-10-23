@@ -55,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirestore, useUser, setDocumentNonBlocking, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 
