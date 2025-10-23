@@ -1,6 +1,19 @@
 
 {
   "entities": {
+    "LoginMapping": {
+      "title": "Login to Email Mapping",
+      "description": "Maps a plain text login name to a Firebase Auth email.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's actual email address for authentication."
+        }
+      },
+      "required": ["email"]
+    },
     "UserProfile": {
       "title": "User Profile",
       "description": "Represents a user's profile information.",
@@ -92,6 +105,10 @@
     ]
   },
   "firestore": {
+    "/logins/{loginId}": {
+      "schema": { "$ref": "#/entities/LoginMapping" },
+      "description": "Maps a plain text login name to a Firebase Auth email. Publicly readable."
+    },
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores user profile information, including their role."
@@ -110,3 +127,4 @@
     }
   }
 }
+

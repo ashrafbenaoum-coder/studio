@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
 
 const formSchema = z.object({
-  login: z.string().min(1, "L'utilisateur est requis."),
+  login: z.string().min(1, "Login est requis."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -57,19 +57,23 @@ export function LoginForm() {
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
     try {
-      // Append a domain to the username to make it a valid email for Firebase Auth
-      const email = values.login.includes('@') ? values.login : `${values.login}@gds.com`;
+      const firestore = getFirestore(auth.app);
+      const loginRef = doc(firestore, "logins", values.login.toLowerCase());
+      const loginDoc = await getDoc(loginRef);
+
+      if (!loginDoc.exists()) {
+        throw new Error("login-not-found");
+      }
+
+      const email = loginDoc.data().email;
       const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
       const loggedInUser = userCredential.user;
 
-      // After successful login, check and set the admin role if needed
-      if (loggedInUser && values.login.toLowerCase() === 'gds') {
-        const firestore = getFirestore(auth.app);
+      if (loggedInUser && values.login.toLowerCase() === "gds") {
         const userDocRef = doc(firestore, "users", loggedInUser.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (!userDoc.exists()) {
-          // If the user document doesn't exist, create it with the Administrator role
           await setDoc(userDocRef, {
             email: loggedInUser.email,
             role: "Administrator",
@@ -82,16 +86,17 @@ export function LoginForm() {
       }
 
     } catch (error: any) {
-      console.error("Firebase sign-in error:", error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
-         setLoginError("L'utilisateur ou le mot de passe est incorrect.");
-      } else {
-        setLoginError("Une erreur de connexion s'est produite.");
-      }
+      console.error("Login error:", error);
+      const message =
+        error.code === "auth/wrong-password" || error.code === 'auth/invalid-credential' || error.message === "login-not-found"
+          ? "Login ou mot de passe incorrect."
+          : "Une erreur de connexion s'est produite.";
+
+      setLoginError(message);
       toast({
         variant: "destructive",
         title: "Erreur de connexion",
-        description: "Veuillez vérifier vos informations d'identification et réessayer.",
+        description: message,
       });
     }
   };
@@ -99,7 +104,7 @@ export function LoginForm() {
   if (isUserLoading || user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <p>Loading...</p>
+        <p>Chargement...</p>
       </div>
     );
   }
@@ -122,7 +127,7 @@ export function LoginForm() {
               name="login"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Utilisateur</FormLabel>
+                  <FormLabel>Login</FormLabel>
                   <FormControl>
                     <Input type="text" {...field} />
                   </FormControl>
@@ -135,7 +140,7 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Mot de passe</FormLabel>
+                  <FormLabel>Password</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
@@ -144,7 +149,7 @@ export function LoginForm() {
               )}
             />
             {loginError && (
-                <p className="text-sm font-medium text-destructive">{loginError}</p>
+              <p className="text-sm font-medium text-destructive">{loginError}</p>
             )}
             <Button type="submit" className="w-full !mt-6">
               Se connecter
@@ -155,3 +160,4 @@ export function LoginForm() {
     </Card>
   );
 }
+
