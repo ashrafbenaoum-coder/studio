@@ -37,8 +37,6 @@ import {
   useMemoFirebase,
   setDocumentNonBlocking,
   useDoc,
-  FirestorePermissionError,
-  errorEmitter
 } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
@@ -64,7 +62,7 @@ export function UsersDashboard() {
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setNewUserData((prev) => ({ ...prev, [name]: value.replace('@gds.com', '') }));
+    setNewUserData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleRoleChange = (value: "Administrator" | "Viewer") => {
@@ -80,11 +78,15 @@ export function UsersDashboard() {
         });
         return;
     }
+    
     // Create a reference for a new document to get a unique ID
     const newUserRef = doc(collection(firestore, "users"));
     
+    // Sanitize the email input to ensure it's just the username part
+    const username = newUserData.email.split('@')[0];
+
     const userData = {
-      email: `${newUserData.email}@gds.com`,
+      email: `${username}@gds.com`,
       role: newUserData.role,
     };
     
@@ -202,7 +204,7 @@ export function UsersDashboard() {
         </CardHeader>
         <CardContent>
             <div className="text-center text-muted-foreground py-12">
-                La gestion des utilisateurs existants (affichage, suppression) se fait désormais via la console Firebase pour plus de sécurité et de stabilité.
+                La gestion des utilisateurs (affichage, suppression) se fait via la console Firebase pour plus de sécurité.
             </div>
         </CardContent>
       </Card>

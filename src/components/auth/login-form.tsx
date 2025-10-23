@@ -57,11 +57,14 @@ export function LoginForm() {
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setLoginError(null);
     try {
-      const email = values.login.includes('@') ? values.login : `${values.login}@gds.com`;
+      // Sanitize the login input to ensure it's always in the correct format.
+      const sanitizedLogin = values.login.split('@')[0];
+      const email = `${sanitizedLogin}@gds.com`;
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
       const loggedInUser = userCredential.user;
 
-      if (loggedInUser && values.login.toLowerCase() === "gds") {
+      if (loggedInUser && sanitizedLogin.toLowerCase() === "gds") {
         const firestore = getFirestore(auth.app);
         const userDocRef = doc(firestore, "users", loggedInUser.uid);
         const userDoc = await getDoc(userDocRef);
