@@ -46,7 +46,7 @@ export default function InventoryPage({ params }: { params: Promise<{ storeId: s
       user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products") : null,
     [firestore, user, storeId, aisleId]
   );
-  const { data: products, isLoading: areProductsLoading } = useCollection<Omit<Product, "id">>(productsQuery);
+  const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isPending, startTransition] = useTransition();
