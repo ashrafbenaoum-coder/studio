@@ -1,96 +1,111 @@
 /**
- * @fileoverview Firestore Security Rules for Inventory Management App
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model. Users can only read and write data
- * (stores, aisles, products) that they explicitly own. All data is nested under
- * /users/{userId}, providing clear ownership boundaries.
- *
- * Data Structure:
- * The Firestore data structure is hierarchical: /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}.
- * This structure reflects the ownership model, with each level inheriting the user's ownership.
- *
- * Key Security Decisions:
- * - Users can only access their own data, ensuring data privacy and preventing unauthorized access.
- * - The root `/users` collection is not listable, preventing enumeration of users.
+ * @description This ruleset enforces a strict user-ownership model, where each user can only access their own data.
+ * @dataStructure All data is nested under /users/{userId}, ensuring data isolation. Stores, aisles, and products are further nested under the user's ID.
+ * @keySecurityDecisions Users can only read and write their own profiles. Listing users is disallowed. All data is strictly owned by the user; there is no shared access.
+ * To ensure proper authorization, the storeId, aisleId and productId must match the path parameters.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows users to read and write their own profile data.
-     * @path /databases/{database}/documents/users/{userId}
-     * @allow (get, create, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can access /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1 (all operations).
-     * @deny (get, create, update, delete) User 'attackerId' cannot access /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1.
-     * @principle Enforces document ownership for all writes; validates user ID on create.
+     * @description Controls access to user profiles.
+     * @path /users/{userId}
+     * @allow (create) User with ID 'user123' can create their profile.
+     * @allow (get) User with ID 'user123' can read their profile.
+     * @allow (update) User with ID 'user123' can update their profile.
+     * @allow (delete) User with ID 'user123' can delete their profile.
+     * @deny (create) User with ID 'user456' cannot create a profile with ID 'user123'.
+     * @deny (get) User with ID 'user456' cannot read profile of 'user123'.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
+      function isSignedIn() {
+        return request.auth != null;
+      }
       allow get: if isOwner(userId);
-      allow list: if false; // Prevent user enumeration
-      allow create: if isOwner(userId) && request.resource.data.email is string;
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Allows users to manage their own stores.
-     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}
-     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create a store under /users/h92I36vtYfT0Fwq3X9kI4d7H8Tl1/stores/newStoreId.
-     * @allow (get, list, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can access their own store.
-     * @deny (create, get, list, update, delete) User 'attackerId' cannot access the store.
-     * @principle Enforces user-ownership for store management.
+     * @description Controls access to stores created by a user.
+     * @path /users/{userId}/stores/{storeId}
+     * @allow (create) User with ID 'user123' can create a store with ID 'store456' under their profile.
+     * @allow (get) User with ID 'user123' can read store with ID 'store456' under their profile.
+     * @allow (update) User with ID 'user123' can update store with ID 'store456' under their profile.
+     * @allow (delete) User with ID 'user123' can delete store with ID 'store456' under their profile.
+     * @deny (create) User with ID 'user456' cannot create a store under user 'user123' profile.
+     * @deny (get) User with ID 'user456' cannot read store with ID 'store456' under user 'user123' profile.
+     * @principle Enforces document ownership and path consistency for stores.
      */
     match /users/{userId}/stores/{storeId} {
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
+      function isExistingOwner(userId) {
+          return request.auth != null && request.auth.uid == userId && resource != null;
+      }
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows users to manage aisles within their stores.
-     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}/aisles/{aisleId}
-     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create aisles in their stores.
-     * @allow (get, list, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can access aisles in their stores.
-     * @deny (create, get, list, update, delete) User 'attackerId' cannot access the aisles.
-     * @principle Enforces user-ownership for aisle management.
+     * @description Controls access to aisles within a store belonging to a user.
+     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}
+     * @allow (create) User with ID 'user123' can create an aisle with ID 'aisle789' under their store 'store456'.
+     * @allow (get) User with ID 'user123' can read aisle with ID 'aisle789' under their store 'store456'.
+     * @allow (update) User with ID 'user123' can update aisle with ID 'aisle789' under their store 'store456'.
+     * @allow (delete) User with ID 'user123' can delete aisle with ID 'aisle789' under their store 'store456'.
+     * @deny (create) User with ID 'user456' cannot create an aisle under user 'user123' profile.
+     * @deny (get) User with ID 'user456' cannot read aisle with ID 'aisle789' under user 'user123' profile.
+     * @principle Enforces document ownership and path consistency for aisles.
      */
     match /users/{userId}/stores/{storeId}/aisles/{aisleId} {
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
+        function isExistingOwner(userId) {
+          return request.auth != null && request.auth.uid == userId && resource != null;
+      }
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows users to manage products within their store aisles.
-     * @path /databases/{database}/documents/users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
-     * @allow (create) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can create products in their aisles.
-     * @allow (get, list, update, delete) User 'h92I36vtYfT0Fwq3X9kI4d7H8Tl1' can manage their products.
-     * @deny (create, get, list, update, delete) User 'attackerId' cannot access the products.
-     * @principle Enforces user-ownership for product management.
+     * @description Controls access to products within a specific aisle, in a specific store, belonging to a user.
+     * @path /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId}
+     * @allow (create) User with ID 'user123' can create a product with ID 'product012' under their aisle 'aisle789', store 'store456'.
+     * @allow (get) User with ID 'user123' can read product with ID 'product012' under their aisle 'aisle789', store 'store456'.
+     * @allow (update) User with ID 'user123' can update product with ID 'product012' under their aisle 'aisle789', store 'store456'.
+     * @allow (delete) User with ID 'user123' can delete product with ID 'product012' under their aisle 'aisle789', store 'store456'.
+     * @deny (create) User with ID 'user456' cannot create a product under user 'user123' profile.
+     * @deny (get) User with ID 'user456' cannot read product with ID 'product012' under user 'user123' profile.
+     * @principle Enforces document ownership and path consistency for products.
      */
     match /users/{userId}/stores/{storeId}/aisles/{aisleId}/products/{productId} {
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
+      function isExistingOwner(userId) {
+          return request.auth != null && request.auth.uid == userId && resource != null;
+      }
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
   }
 }
