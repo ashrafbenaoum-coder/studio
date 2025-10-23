@@ -26,6 +26,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
+import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
 
 const formSchema = z.object({
   login: z.string().min(1, "L'utilisateur est requis."),
@@ -58,7 +59,28 @@ export function LoginForm() {
     try {
       // Append a domain to the username to make it a valid email for Firebase Auth
       const email = values.login.includes('@') ? values.login : `${values.login}@gds.com`;
-      await signInWithEmailAndPassword(auth, email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
+      const loggedInUser = userCredential.user;
+
+      // After successful login, check and set the admin role if needed
+      if (loggedInUser && values.login.toLowerCase() === 'gds') {
+        const firestore = getFirestore(auth.app);
+        const userDocRef = doc(firestore, "users", loggedInUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+          // If the user document doesn't exist, create it with the Administrator role
+          await setDoc(userDocRef, {
+            email: loggedInUser.email,
+            role: "Administrator",
+          });
+          toast({
+            title: "Compte Administrateur Initialisé",
+            description: "Le rôle d'administrateur a été assigné à 'gds'.",
+          });
+        }
+      }
+
     } catch (error: any) {
       console.error("Firebase sign-in error:", error);
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
