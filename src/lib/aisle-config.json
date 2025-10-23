@@ -1,0 +1,12 @@
+{
+    "A1": { "pair": 200, "impair": 205 },
+    "A2": { "pair": 180, "impair": 185 },
+    "A3": { "pair": 200, "impair": 205 },
+    "A4": { "pair": 180, "impair": 185 },
+    "A5": { "pair": 180, "impair": 185 },
+    "B1": { "pair": 200, "impair": 205 },
+    "B2": { "pair": 180, "impair": 185 },
+    "B3": { "pair": 200, "impair": 205 },
+    "B4": { "pair": 180, "impair": 185 },
+    "B5": { "pair": 180, "impair": 185 }
+}

@@ -27,6 +27,7 @@ import type { Product } from "@/lib/types";
 import { BarcodeScannerDialog } from "./barcode-scanner-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CalculatorPopover } from "./calculator-popover";
+import aisleConfig from "@/lib/aisle-config.json";
 
 const formSchema = z.object({
   address: z.string().regex(/^([A-Z])-\d{3}-\d{4}-\d{2}$/, "Le format de l'adresse doit être A-XXX-XXXX-XX."),
@@ -35,7 +36,12 @@ const formSchema = z.object({
   expirationDate: z.string().regex(/^\d{8}$/, "La date doit être au format YYYYMMDD."),
 });
 
+type AisleConfig = { [key: string]: { pair: number; impair: number } };
+
 const generatePickingRange = (aisleName: string): { impairStart: string; impairEnd: string; pairStart: string; pairEnd: string; } | null => {
+    const config = (aisleConfig as AisleConfig)[aisleName];
+    if (!config) return null;
+
     const match = aisleName.match(/^([A-Z])(\d+)$/);
     if (!match) return null;
 
@@ -45,8 +51,8 @@ const generatePickingRange = (aisleName: string): { impairStart: string; impairE
 
     return {
         impairStart: `${prefix}-${section}-0001-00`,
-        impairEnd: `${prefix}-${section}-0205-00`,
-        pairStart: `${prefix}-${section}-0200-00`,
+        impairEnd: `${prefix}-${section}-${config.impair.toString().padStart(4, '0')}-00`,
+        pairStart: `${prefix}-${section}-${config.pair.toString().padStart(4, '0')}-00`,
         pairEnd: `${prefix}-${section}-0002-00`,
     };
 };
