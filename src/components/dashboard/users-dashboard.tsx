@@ -126,7 +126,7 @@ export function UsersDashboard() {
         </CardHeader>
         <CardContent>
           <div className="text-center text-muted-foreground py-12">
-            La gestion des utilisateurs existants se fait désormais via la console Firebase pour plus de sécurité.
+            mkybansh lya hna les utilisateur li kancree
           </div>
         </CardContent>
       </Card>
