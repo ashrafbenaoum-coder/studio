@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   MultiFormatReader,
   BarcodeFormat,
@@ -34,6 +34,17 @@ export function BarcodeScannerDialog({
   const readerRef = useRef<MultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const stopScanner = useCallback(() => {
+    readerRef.current?.reset();
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!readerRef.current) {
       const hints = new Map();
@@ -50,7 +61,23 @@ export function BarcodeScannerDialog({
       readerRef.current = reader;
     }
 
-    const startScanner = async () => {
+    const startScanner = (stream: MediaStream) => {
+        if (videoRef.current && readerRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(e => console.error("Video play failed:", e));
+
+            readerRef.current.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
+                if (result) {
+                    onScan(result.getText());
+                    onOpenChange(false); // Close dialog on successful scan
+                } else if (error && !(error instanceof NotFoundException)) {
+                    console.error("Barcode decoding error:", error);
+                }
+            });
+        }
+    }
+    
+    const getCameraPermission = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -61,21 +88,10 @@ export function BarcodeScannerDialog({
         });
         setHasCameraPermission(true);
         streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-
-          readerRef.current?.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
-            if (result) {
-              onScan(result.getText());
-              onOpenChange(false);
-              readerRef.current?.reset();
-            }
-          });
-        }
+        startScanner(stream);
       } catch (error: any) {
         setHasCameraPermission(false);
+        console.error("Error accessing camera:", error);
         if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
           toast({
             variant: "destructive",
@@ -83,31 +99,26 @@ export function BarcodeScannerDialog({
             description: "Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur.",
           });
         } else {
-          toast({
+           toast({
             variant: "destructive",
             title: "Erreur de caméra",
-            description: "Impossible d'accéder à la caméra. Vérifiez les permissions ou réessayez.",
+            description: "Impossible d'accéder à la caméra. Vérifiez qu'elle n'est pas utilisée par une autre application.",
           });
         }
-        onOpenChange(false);
+        onOpenChange(false); // Close dialog on permission error
       }
     };
 
-    const stopScanner = () => {
-      readerRef.current?.reset();
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      if (videoRef.current) videoRef.current.srcObject = null;
-    };
-
     if (open) {
-      startScanner();
+      getCameraPermission();
     } else {
       stopScanner();
     }
 
-    return () => stopScanner();
-  }, [open, onScan, onOpenChange, toast]);
+    return () => {
+      stopScanner();
+    };
+  }, [open, onOpenChange, onScan, toast, stopScanner]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,11 +143,16 @@ export function BarcodeScannerDialog({
               <Alert variant="destructive">
                 <AlertTitle>Accès à la caméra requis</AlertTitle>
                 <AlertDescription>
-                  Veuillez autoriser l'accès à la caméra pour scanner les codes-barres.
+                  Veuillez autoriser l'accès à la caméra pour utiliser cette fonctionnalité.
                 </AlertDescription>
               </Alert>
             </div>
           )}
+           {hasCameraPermission === undefined && (
+             <div className="absolute inset-0 flex items-center justify-center p-4">
+                <p className="text-muted-foreground">Demande d'accès à la caméra...</p>
+             </div>
+           )}
         </div>
       </DialogContent>
     </Dialog>
