@@ -66,7 +66,7 @@ interface User {
 // Mock data for now, representing users in the system
 const initialUsers: User[] = [
   { id: "1", email: "user1@example.com", role: "Viewer" },
-  { id: "2", email: "user2@example.com", role: "Editor" },
+  { id: "2", email: "user2@example.com", role: "Administrator" },
 ];
 
 export function UsersDashboard() {
@@ -180,7 +180,7 @@ export function UsersDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Viewer">Viewer</SelectItem>
-                      <SelectItem value="Editor">Editor</SelectItem>
+                      <SelectItem value="Administrator">Administrator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -256,7 +256,7 @@ export function UsersDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Viewer">Viewer</SelectItem>
-                      <SelectItem value="Editor">Editor</SelectItem>
+                      <SelectItem value="Administrator">Administrator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -287,5 +287,3 @@ export function UsersDashboard() {
     </div>
   );
 }
-
-    
