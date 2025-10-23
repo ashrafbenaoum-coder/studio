@@ -153,7 +153,7 @@ export function UsersDashboard() {
               <form onSubmit={handleCreateUser} className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Logine</Label>
-                  <Input id="email" name="email" type="email" required />
+                  <Input id="email" name="email" type="text" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Mot de passe</Label>
@@ -221,7 +221,7 @@ export function UsersDashboard() {
              <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-email">Logine</Label>
-                <Input id="edit-email" name="email" type="email" defaultValue={userToEdit.email} required />
+                <Input id="edit-email" name="email" type="text" defaultValue={userToEdit.email} required />
               </div>
               {/* TODO: Add role editing here */}
               <DialogFooter>
