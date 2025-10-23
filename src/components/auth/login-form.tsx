@@ -26,7 +26,6 @@ import * as z from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   login: z.string().min(1, "Login est requis."),
@@ -67,7 +66,6 @@ export function LoginForm() {
 
       const email = loginDoc.data().email;
       const userCredential = await signInWithEmailAndPassword(auth, email, values.password);
-      const loggedInUser = userCredential.user;
 
       toast({
         title: "Connexion réussie",
@@ -76,7 +74,7 @@ export function LoginForm() {
 
     } catch (error: any) {
       const message =
-        error.code === "auth/wrong-password" || error.message === "login-not-found" || error.code === "auth/invalid-credential"
+        error.code === "auth/wrong-password" || error.message === "login-not-found"
           ? "Login ou mot de passe incorrect."
           : "Une erreur de connexion s'est produite.";
 
@@ -92,8 +90,7 @@ export function LoginForm() {
   if (isUserLoading || user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Chargement...</p>
+        <p>Chargement...</p>
       </div>
     );
   }
@@ -105,7 +102,7 @@ export function LoginForm() {
           Se connecter
         </CardTitle>
         <CardDescription className="text-center">
-          Accédez à votre tableau de bord de gestion des stocks.
+          Entrez votre login et mot de passe.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -118,7 +115,7 @@ export function LoginForm() {
                 <FormItem>
                   <FormLabel>Login</FormLabel>
                   <FormControl>
-                    <Input type="text" placeholder="Nom d'utilisateur" {...field} />
+                    <Input type="text" placeholder="exemple" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -140,8 +137,7 @@ export function LoginForm() {
             {loginError && (
               <p className="text-sm font-medium text-destructive">{loginError}</p>
             )}
-            <Button type="submit" className="w-full !mt-6" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="w-full !mt-6">
               Se connecter
             </Button>
           </form>
