@@ -43,7 +43,7 @@ export function UsersDashboard() {
   
   const adminProfileRef = useMemoFirebase(() => adminUser ? doc(firestore, 'users', adminUser.uid) : null, [adminUser, firestore]);
   const { data: adminProfile } = useDoc<UserProfile>(adminProfileRef);
-  const isAdmin = adminProfile?.role === 'Administrator';
+  const isAdmin = useMemo(() => adminProfile?.role === "Administrator", [adminProfile]);
 
   const [isAddUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({ login: '', password: '', role: 'Viewer' as 'Administrator' | 'Viewer'});
@@ -58,9 +58,12 @@ export function UsersDashboard() {
   };
 
   const handleCreateUser = () => {
+    // This is a simulation because creating users with passwords requires admin privileges
+    // that should not be exposed on the client-side.
+    // The correct and secure way is to use the Firebase Console or a backend function.
     toast({
-      title: "Création (Simulation)",
-      description: `Dans une application réelle, un compte serait créé pour l'utilisateur '${newUserData.login}'.`,
+      title: "Création d'utilisateur (Simulation)",
+      description: `Pour créer un utilisateur réel, veuillez utiliser la console Firebase.`,
     });
     console.log("Simulating creation of user:", {
         email: `${newUserData.login}@gds.com`,
@@ -78,7 +81,7 @@ export function UsersDashboard() {
           <div>
             <CardTitle>Gérer les utilisateurs</CardTitle>
             <CardDescription>
-             Créez de nouveaux utilisateurs. La gestion des utilisateurs existants a été simplifiée.
+             Créez de nouveaux utilisateurs (en simulation) ou utilisez la console Firebase pour une gestion complète.
             </CardDescription>
           </div>
           <Dialog open={isAddUserDialogOpen} onOpenChange={setAddUserDialogOpen}>
@@ -90,9 +93,9 @@ export function UsersDashboard() {
             </DialogTrigger>
             <DialogContent>
                  <DialogHeader>
-                    <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
+                    <DialogTitle>Créer un nouvel utilisateur (Simulation)</DialogTitle>
                     <DialogDescription>
-                        Entrez les informations pour créer un nouveau compte (simulation).
+                        Cette interface simule la création d'un utilisateur. Pour une création réelle, utilisez la console Firebase.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -126,7 +129,7 @@ export function UsersDashboard() {
         </CardHeader>
         <CardContent>
           <div className="text-center text-muted-foreground py-12">
-            La gestion des utilisateurs existants se fait désormais via la console Firebase pour plus de sécurité.
+            Pour des raisons de sécurité, la création et la gestion des utilisateurs réels doivent être effectuées via la console d'administration de Firebase.
           </div>
         </CardContent>
       </Card>
