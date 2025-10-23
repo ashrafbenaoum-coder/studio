@@ -26,6 +26,7 @@ import * as z from "zod";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   login: z.string().min(1, "Login est requis."),
@@ -137,7 +138,8 @@ export function LoginForm() {
             {loginError && (
               <p className="text-sm font-medium text-destructive">{loginError}</p>
             )}
-            <Button type="submit" className="w-full !mt-6">
+            <Button type="submit" className="w-full !mt-6" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Se connecter
             </Button>
           </form>
