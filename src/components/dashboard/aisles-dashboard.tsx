@@ -9,11 +9,12 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Archive, Trash2, Loader2, Package } from "lucide-react";
-import type { Aisle, Store, Product } from "@/lib/types";
+import { Plus, Archive, Trash2, Loader2, Package, Pencil } from "lucide-react";
+import type { Aisle, Store } from "@/lib/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import {
   useCollection,
@@ -33,63 +36,49 @@ import {
   useMemoFirebase,
   addDocumentNonBlocking,
   deleteDocumentNonBlocking,
+  setDocumentNonBlocking
 } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 
-function AisleCard({ storeId, aisle }: { storeId: string; aisle: Aisle; onDelete: (aisle: Aisle) => void; }) {
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const productsQuery = useMemoFirebase(
-    () =>
-      user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles", aisle.id, "products") : null,
-    [firestore, user, storeId, aisle.id]
-  );
-  const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
-
-  const totalQuantity = useMemo(() => {
-    if (!products) return 0;
-    return products.reduce((sum, product) => sum + product.quantity, 0);
-  }, [products]);
+function AisleCard({
+  storeId,
+  aisle,
+  onDelete,
+  onEdit,
+}: {
+  storeId: string;
+  aisle: Aisle;
+  onDelete: (aisle: Aisle) => void;
+  onEdit: (aisle: Aisle) => void;
+}) {
 
   return (
-    <Card className="group relative transition-colors hover:bg-muted/50">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2 h-7 w-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onDelete(aisle);
-        }}
-      >
-        <Trash2 className="h-4 w-4" />
-        <span className="sr-only">Supprimer le rayon</span>
-      </Button>
-      <Link
-        href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
-        passHref
-        className="block h-full cursor-pointer"
-      >
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
-          <Archive className="h-5 w-5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          {areProductsLoading ? (
-             <div className="flex items-center text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                <span>Chargement...</span>
-            </div>
-          ) : (
-            <div className="flex items-center text-sm font-semibold">
-              <Package className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>Quantité totale: {totalQuantity}</span>
-            </div>
-          )}
-        </CardContent>
-      </Link>
+    <Card className="group relative flex flex-col justify-between transition-colors hover:bg-muted/50">
+        <Link
+            href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
+            passHref
+            className="block cursor-pointer flex-grow"
+        >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
+                <Archive className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <p className="text-xs text-muted-foreground">
+                    Cliquez pour gérer les produits de ce rayon.
+                </p>
+            </CardContent>
+        </Link>
+        <CardFooter className="flex gap-2 p-2 pt-0">
+            <Button variant="outline" size="sm" className="w-full" onClick={() => onEdit(aisle)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Modifier
+            </Button>
+            <Button variant="destructive" size="sm" className="w-full" onClick={() => onDelete(aisle)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Supprimer
+            </Button>
+        </CardFooter>
     </Card>
   );
 }
@@ -114,6 +103,7 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
 
   const [newAisleName, setNewAisleName] = useState("");
   const [aisleToDelete, setAisleToDelete] = useState<Aisle | null>(null);
+  const [aisleToEdit, setAisleToEdit] = useState<Aisle | null>(null);
 
   const handleAddAisle = () => {
     if (newAisleName.trim() && user && aislesQuery) {
@@ -133,6 +123,16 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
       setAisleToDelete(null);
     }
   };
+  
+  const handleUpdateAisle = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if(user && aisleToEdit) {
+      const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleToEdit.id);
+      setDocumentNonBlocking(docRef, { name: aisleToEdit.name }, { merge: true });
+      setAisleToEdit(null);
+    }
+  };
+
 
   const isLoading = isStoreLoading || areAislesLoading;
 
@@ -162,6 +162,32 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!aisleToEdit} onOpenChange={(open) => !open && setAisleToEdit(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Modifier le rayon</DialogTitle>
+            </DialogHeader>
+            {aisleToEdit && (
+                <form onSubmit={handleUpdateAisle} className="space-y-4 py-4">
+                    <div>
+                        <Label htmlFor="edit-aisle-name">Nom du rayon</Label>
+                        <Input 
+                            id="edit-aisle-name" 
+                            value={aisleToEdit.name} 
+                            onChange={(e) => setAisleToEdit({...aisleToEdit, name: e.target.value})} 
+                        />
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button type="button" variant="ghost">Annuler</Button>
+                        </DialogClose>
+                        <Button type="submit">Enregistrer</Button>
+                    </DialogFooter>
+                </form>
+            )}
+        </DialogContent>
+      </Dialog>
 
       <Breadcrumb>
         <BreadcrumbList>
@@ -201,13 +227,14 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
       {isLoading && <Loader2 className="mx-auto my-8 h-8 w-8 animate-spin text-primary" />}
 
       {!isLoading && sortedAisles && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sortedAisles.map((aisle) => (
             <AisleCard 
               key={aisle.id} 
               storeId={storeId} 
               aisle={aisle}
               onDelete={setAisleToDelete}
+              onEdit={setAisleToEdit}
             />
           ))}
         </div>
@@ -219,4 +246,5 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
       )}
     </div>
   );
-}
+
+    
