@@ -14,6 +14,10 @@
           "type": "string",
           "format": "email",
           "description": "The user's email address."
+        },
+        "role": {
+            "type": "string",
+            "enum": ["Administrator", "Viewer"]
         }
       }
     },
@@ -83,15 +87,13 @@
     "providers": [
       "password",
       "anonymous"
-    ],
-    "customClaims": {
-        "role": {
-            "type": "string",
-            "enum": ["Administrator", "Viewer"]
-        }
-    }
+    ]
   },
   "firestore": {
+    "/users": {
+        "schema": { "$ref": "#/entities/UserProfile" },
+        "description": "Collection of all user profiles, listable by admin."
+    },
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores user profile information, accessible only by the user themselves unless the requester is an admin."

@@ -3,12 +3,13 @@
 
 import { useState, useTransition, useMemo } from "react";
 import { runExpirationAnalysis } from "@/lib/actions";
-import type { Product, Store, Aisle } from "@/lib/types";
+import type { Product, Store, Aisle, UserProfile } from "@/lib/types";
 import { InventoryForm } from "@/components/dashboard/inventory-form";
 import { InventoryList } from "@/components/dashboard/inventory-list";
 import { ExpirationAlerts } from "@/components/dashboard/expiration-alerts";
 import { useToast } from "@/hooks/use-toast";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Users } from "lucide-react";
 import {
   useCollection,
   useDoc,
@@ -22,27 +23,36 @@ import {
 import { collection, doc, writeBatch, getDocs } from "firebase/firestore";
 import type { Alert } from "@/lib/types";
 
-export function InventoryDashboard({ storeId, aisleId }: { storeId: string; aisleId: string }) {
+export function InventoryDashboard({ storeId, aisleId, userId: targetUserId }: { storeId: string; aisleId: string, userId?: string }) {
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user: currentUser } = useUser();
   const firestore = useFirestore();
 
+  const userId = targetUserId || currentUser?.uid;
+  const isViewingOtherUser = targetUserId && currentUser?.uid !== targetUserId;
+
+  const targetUserDocRef = useMemoFirebase(
+    () => (userId ? doc(firestore, "users", userId) : null),
+    [firestore, userId]
+  );
+  const { data: targetUser } = useDoc<UserProfile>(targetUserDocRef);
+
   const storeDocRef = useMemoFirebase(
-    () => (user ? doc(firestore, "users", user.uid, "stores", storeId) : null),
-    [firestore, user, storeId]
+    () => (userId ? doc(firestore, "users", userId, "stores", storeId) : null),
+    [firestore, userId, storeId]
   );
   const { data: store } = useDoc<Omit<Store, "id">>(storeDocRef);
   
   const aisleDocRef = useMemoFirebase(
-    () => (user ? doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId) : null),
-    [firestore, user, storeId, aisleId]
+    () => (userId ? doc(firestore, "users", userId, "stores", storeId, "aisles", aisleId) : null),
+    [firestore, userId, storeId, aisleId]
   );
   const { data: aisle } = useDoc<Omit<Aisle, "id">>(aisleDocRef);
 
   const productsQuery = useMemoFirebase(
     () =>
-      user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products") : null,
-    [firestore, user, storeId, aisleId]
+      userId ? collection(firestore, "users", userId, "stores", storeId, "aisles", aisleId, "products") : null,
+    [firestore, userId, storeId, aisleId]
   );
   const { data: products, isLoading: areProductsLoading } = useCollection<Product>(productsQuery);
 
@@ -65,22 +75,22 @@ export function InventoryDashboard({ storeId, aisleId }: { storeId: string; aisl
   };
   
   const updateProduct = (product: Product) => {
-    if (user) {
-        const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products", product.id);
+    if (userId) {
+        const docRef = doc(firestore, "users", userId, "stores", storeId, "aisles", aisleId, "products", product.id);
         const { id, ...productData } = product;
         setDocumentNonBlocking(docRef, productData, { merge: true });
     }
   };
 
   const deleteProduct = (productId: string) => {
-    if (user) {
-        const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleId, "products", productId);
+    if (userId) {
+        const docRef = doc(firestore, "users", userId, "stores", storeId, "aisles", aisleId, "products", productId);
         deleteDocumentNonBlocking(docRef);
     }
   };
   
   const deleteAllProducts = async () => {
-    if (user && productsQuery) {
+    if (userId && productsQuery) {
         const querySnapshot = await getDocs(productsQuery);
         const batch = writeBatch(firestore);
         querySnapshot.forEach((doc) => {
@@ -119,18 +129,43 @@ export function InventoryDashboard({ storeId, aisleId }: { storeId: string; aisl
       }
     });
   };
+  
+  const usersLink = '/dashboard/users';
+  const userStoresLink = `/dashboard/users/${userId}/stores`;
+  const userAislesLink = `/dashboard/users/${userId}/stores/${storeId}/aisles`;
+  const myStoresLink = '/dashboard/stores';
+  const myAislesLink = `/dashboard/stores/${storeId}/aisles`;
+
 
   return (
     <div className="space-y-6">
         <Breadcrumb>
             <BreadcrumbList>
-                <BreadcrumbItem>
-                    <BreadcrumbLink href="/dashboard/stores">Magasins</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                    <BreadcrumbLink href={`/dashboard/stores/${storeId}/aisles`}>{store?.name ?? '...'}</BreadcrumbLink>
-                </BreadcrumbItem>
+                {isViewingOtherUser ? (
+                    <>
+                        <BreadcrumbItem>
+                            <BreadcrumbLink href={usersLink}><Users className="h-4 w-4" /> Utilisateurs</BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                            <BreadcrumbLink href={userStoresLink}>{targetUser?.displayName || targetUser?.email || '...'}</BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                            <BreadcrumbLink href={userAislesLink}>{store?.name ?? '...'}</BreadcrumbLink>
+                        </BreadcrumbItem>
+                    </>
+                ) : (
+                    <>
+                        <BreadcrumbItem>
+                            <BreadcrumbLink href={myStoresLink}>Magasins</BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                            <BreadcrumbLink href={myAislesLink}>{store?.name ?? '...'}</BreadcrumbLink>
+                        </BreadcrumbItem>
+                    </>
+                )}
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                     <BreadcrumbPage>{aisle?.name ?? '...'}</BreadcrumbPage>

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Archive, Trash2, Loader2, Package, Pencil, MoreHorizontal } from "lucide-react";
-import type { Aisle, Store, Product } from "@/lib/types";
+import { Plus, Archive, Trash2, Loader2, Package, Pencil, MoreHorizontal, Users } from "lucide-react";
+import type { Aisle, Store, Product, UserProfile } from "@/lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,22 +47,25 @@ import {
 import { collection, doc } from "firebase/firestore";
 
 function AisleCard({
+  userId,
   storeId,
   aisle,
   onDelete,
   onEdit,
 }: {
+  userId: string;
   storeId: string;
   aisle: Aisle;
   onDelete: (aisle: Aisle) => void;
   onEdit: (aisle: Aisle) => void;
 }) {
-  const { user } = useUser();
+  const { user: currentUser } = useUser();
   const firestore = useFirestore();
+  const isViewingOtherUser = userId && currentUser?.uid !== userId;
 
   const productsQuery = useMemoFirebase(
-    () => (user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles", aisle.id, "products") : null),
-    [firestore, user, storeId, aisle.id]
+    () => (userId ? collection(firestore, "users", userId, "stores", storeId, "aisles", aisle.id, "products") : null),
+    [firestore, userId, storeId, aisle.id]
   );
   const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
@@ -70,6 +73,10 @@ function AisleCard({
     if (!products) return 0;
     return products.reduce((sum, product) => sum + product.quantity, 0);
   }, [products]);
+  
+  const linkPath = isViewingOtherUser 
+    ? `/dashboard/users/${userId}/stores/${storeId}/aisles/${aisle.id}`
+    : `/dashboard/stores/${storeId}/aisles/${aisle.id}`;
 
   return (
     <Card className="group relative flex flex-col justify-between transition-colors hover:bg-muted/50">
@@ -93,7 +100,7 @@ function AisleCard({
       </DropdownMenu>
 
       <Link
-        href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
+        href={linkPath}
         passHref
         className="block cursor-pointer flex-grow"
       >
@@ -118,20 +125,29 @@ function AisleCard({
 }
 
 
-export function AislesDashboard({ storeId }: { storeId: string }) {
-  const { user } = useUser();
+export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: string, userId?: string }) {
+  const { user: currentUser } = useUser();
   const firestore = useFirestore();
+  
+  const userId = targetUserId || currentUser?.uid;
+  const isViewingOtherUser = targetUserId && currentUser?.uid !== targetUserId;
+
+  const targetUserDocRef = useMemoFirebase(
+    () => (userId ? doc(firestore, "users", userId) : null),
+    [firestore, userId]
+  );
+  const { data: targetUser } = useDoc<UserProfile>(targetUserDocRef);
 
   const storeDocRef = useMemoFirebase(
-    () => (user ? doc(firestore, "users", user.uid, "stores", storeId) : null),
-    [firestore, user, storeId]
+    () => (userId ? doc(firestore, "users", userId, "stores", storeId) : null),
+    [firestore, userId, storeId]
   );
   const { data: store, isLoading: isStoreLoading } = useDoc<Omit<Store, "id">>(storeDocRef);
 
   const aislesQuery = useMemoFirebase(
     () =>
-      user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles") : null,
-    [firestore, user, storeId]
+      userId ? collection(firestore, "users", userId, "stores", storeId, "aisles") : null,
+    [firestore, userId, storeId]
   );
   const { data: aisles, isLoading: areAislesLoading } = useCollection<Aisle>(aislesQuery);
 
@@ -140,7 +156,7 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
   const [aisleToEdit, setAisleToEdit] = useState<Aisle | null>(null);
 
   const handleAddAisle = () => {
-    if (newAisleName.trim() && user && aislesQuery) {
+    if (newAisleName.trim() && userId && aislesQuery) {
       const newAisle = {
         name: newAisleName.trim(),
         storeId,
@@ -151,8 +167,8 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
   };
 
   const handleDeleteAisle = (aisle: Aisle) => {
-    if (user) {
-      const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisle.id);
+    if (userId) {
+      const docRef = doc(firestore, "users", userId, "stores", storeId, "aisles", aisle.id);
       deleteDocumentNonBlocking(docRef);
       setAisleToDelete(null);
     }
@@ -160,8 +176,8 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
   
   const handleUpdateAisle = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(user && aisleToEdit) {
-      const docRef = doc(firestore, "users", user.uid, "stores", storeId, "aisles", aisleToEdit.id);
+    if(userId && aisleToEdit) {
+      const docRef = doc(firestore, "users", userId, "stores", storeId, "aisles", aisleToEdit.id);
       setDocumentNonBlocking(docRef, { name: aisleToEdit.name }, { merge: true });
       setAisleToEdit(null);
     }
@@ -174,6 +190,9 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
     if (!aisles) return [];
     return [...aisles].sort((a, b) => a.name.localeCompare(b.name));
   }, [aisles]);
+  
+  const storesLink = isViewingOtherUser ? `/dashboard/users/${userId}/stores` : '/dashboard/stores';
+  const usersLink = '/dashboard/users';
 
   return (
     <div className="space-y-6">
@@ -225,8 +244,23 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
 
       <Breadcrumb>
         <BreadcrumbList>
+          {isViewingOtherUser && (
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbLink href={usersLink}>
+                  <Users className="h-4 w-4" />
+                  Utilisateurs
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                 <BreadcrumbLink href={storesLink}>{targetUser?.displayName || targetUser?.email || '...'}</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+            </>
+          )}
           <BreadcrumbItem>
-            <BreadcrumbLink href="/dashboard/stores">Magasins</BreadcrumbLink>
+            <BreadcrumbLink href={storesLink}>{isViewingOtherUser ? 'Magasins' : 'Magasins'}</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -260,11 +294,12 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
       
       {isLoading && <Loader2 className="mx-auto my-8 h-8 w-8 animate-spin text-primary" />}
 
-      {!isLoading && sortedAisles && (
+      {!isLoading && sortedAisles && userId && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sortedAisles.map((aisle) => (
             <AisleCard 
-              key={aisle.id} 
+              key={aisle.id}
+              userId={userId}
               storeId={storeId} 
               aisle={aisle}
               onDelete={setAisleToDelete}
@@ -281,4 +316,3 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
     </div>
   );
 }
-    

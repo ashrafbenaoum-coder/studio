@@ -22,10 +22,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Store as StoreIcon, Trash2, Loader2 } from "lucide-react";
-import type { Store } from "@/lib/types";
+import { Plus, Store as StoreIcon, Trash2, Loader2, Users } from "lucide-react";
+import type { Store, UserProfile } from "@/lib/types";
 import {
   useCollection,
+  useDoc,
   useFirestore,
   useUser,
   useMemoFirebase,
@@ -33,15 +34,25 @@ import {
   deleteDocumentNonBlocking,
 } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
-export function StoresDashboard() {
-  const { user } = useUser();
+
+export function StoresDashboard({ userId: targetUserId }: { userId?: string }) {
+  const { user: currentUser } = useUser();
   const firestore = useFirestore();
 
+  const userId = targetUserId || currentUser?.uid;
+  const isViewingOtherUser = targetUserId && currentUser?.uid !== targetUserId;
+
+  const targetUserDocRef = useMemoFirebase(
+    () => (userId ? doc(firestore, "users", userId) : null),
+    [firestore, userId]
+  );
+  const { data: targetUser } = useDoc<UserProfile>(targetUserDocRef);
+
   const storesQuery = useMemoFirebase(
-    () =>
-      user ? collection(firestore, "users", user.uid, "stores") : null,
-    [firestore, user]
+    () => (userId ? collection(firestore, "users", userId, "stores") : null),
+    [firestore, userId]
   );
   const { data: stores, isLoading } = useCollection<Store>(storesQuery);
 
@@ -49,7 +60,7 @@ export function StoresDashboard() {
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
 
   const handleAddStore = () => {
-    if (newStoreName.trim() && user && storesQuery) {
+    if (newStoreName.trim() && userId && storesQuery) {
       const newStore = {
         name: newStoreName.trim(),
       };
@@ -59,12 +70,18 @@ export function StoresDashboard() {
   };
 
   const handleDeleteStore = (storeId: string) => {
-    if (user) {
-      const docRef = doc(firestore, "users", user.uid, "stores", storeId);
+    if (userId) {
+      const docRef = doc(firestore, "users", userId, "stores", storeId);
       deleteDocumentNonBlocking(docRef);
       setStoreToDelete(null);
     }
   };
+  
+  const linkPath = (storeId: string) => {
+    return isViewingOtherUser 
+      ? `/dashboard/users/${userId}/stores/${storeId}/aisles`
+      : `/dashboard/stores/${storeId}/aisles`;
+  }
 
   return (
     <div className="space-y-6">
@@ -87,11 +104,31 @@ export function StoresDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {isViewingOtherUser && (
+         <Breadcrumb>
+            <BreadcrumbList>
+                <BreadcrumbItem>
+                    <BreadcrumbLink href="/dashboard/users">
+                        <Users className="h-4 w-4" />
+                        Utilisateurs
+                    </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                    <BreadcrumbPage>{targetUser?.displayName || targetUser?.email || '...'}</BreadcrumbPage>
+                </BreadcrumbItem>
+            </BreadcrumbList>
+        </Breadcrumb>
+      )}
+
 
       <Card>
         <CardHeader>
             <div>
-              <CardTitle>Gérer les magasins</CardTitle>
+              <CardTitle>
+                {isViewingOtherUser ? `Magasins de ${targetUser?.displayName || targetUser?.email || '...'}` : "Gérer les magasins"}
+              </CardTitle>
               <CardDescription>
                 Ajoutez un nouveau magasin ou sélectionnez-en un pour gérer ses rayons.
               </CardDescription>
@@ -131,7 +168,7 @@ export function StoresDashboard() {
                 <span className="sr-only">Supprimer le magasin</span>
               </Button>
               <Link
-                href={`/dashboard/stores/${store.id}/aisles`}
+                href={linkPath(store.id)}
                 passHref
                 className="block h-full cursor-pointer"
               >
