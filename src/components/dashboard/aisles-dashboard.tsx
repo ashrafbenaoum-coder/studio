@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -13,8 +13,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Archive, Trash2, Loader2, Package, Pencil } from "lucide-react";
-import type { Aisle, Store } from "@/lib/types";
+import { Plus, Archive, Trash2, Loader2, Package, Pencil, MoreHorizontal } from "lucide-react";
+import type { Aisle, Store, Product } from "@/lib/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,34 +57,62 @@ function AisleCard({
   onDelete: (aisle: Aisle) => void;
   onEdit: (aisle: Aisle) => void;
 }) {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const productsQuery = useMemoFirebase(
+    () => (user ? collection(firestore, "users", user.uid, "stores", storeId, "aisles", aisle.id, "products") : null),
+    [firestore, user, storeId, aisle.id]
+  );
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+
+  const totalQuantity = useMemo(() => {
+    if (!products) return 0;
+    return products.reduce((sum, product) => sum + product.quantity, 0);
+  }, [products]);
 
   return (
     <Card className="group relative flex flex-col justify-between transition-colors hover:bg-muted/50">
-        <Link
-            href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
-            passHref
-            className="block cursor-pointer flex-grow"
-        >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
-                <Archive className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <p className="text-xs text-muted-foreground">
-                    Cliquez pour gérer les produits de ce rayon.
-                </p>
-            </CardContent>
-        </Link>
-        <CardFooter className="flex gap-2 p-2 pt-0">
-            <Button variant="outline" size="sm" className="w-full" onClick={() => onEdit(aisle)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Modifier
-            </Button>
-            <Button variant="destructive" size="sm" className="w-full" onClick={() => onDelete(aisle)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Supprimer
-            </Button>
-        </CardFooter>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-muted-foreground">
+            <MoreHorizontal className="h-4 w-4" />
+            <span className="sr-only">Options</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onEdit(aisle)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Modifier
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onDelete(aisle)} className="text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Supprimer
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Link
+        href={`/dashboard/stores/${storeId}/aisles/${aisle.id}`}
+        passHref
+        className="block cursor-pointer flex-grow"
+      >
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-lg font-medium">{aisle.name}</CardTitle>
+          <Archive className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+           {productsLoading ? (
+             <p className="text-xs text-muted-foreground flex items-center">
+               <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Chargement...
+             </p>
+           ) : (
+             <p className="text-sm text-muted-foreground">
+               Quantité totale: <span className="font-bold text-foreground">{totalQuantity}</span>
+             </p>
+           )}
+        </CardContent>
+      </Link>
     </Card>
   );
 }
@@ -246,5 +280,5 @@ export function AislesDashboard({ storeId }: { storeId: string }) {
       )}
     </div>
   );
-
+}
     
