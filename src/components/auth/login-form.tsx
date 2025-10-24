@@ -26,7 +26,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc, getDoc, setDoc, getFirestore } from "firebase/firestore";
+import { doc, setDoc, getFirestore } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -57,34 +57,32 @@ export function LoginForm() {
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
-    const firestore = getFirestore(auth.app);
     const inputEmail = values.email.toLowerCase();
 
     // Special handling for the 'gds' admin account bootstrap
     if (inputEmail === "gds") {
+        const firestore = getFirestore(auth.app);
         const gdsEmail = "gds@gds.com";
         try {
-            // Try to sign in as gds@gds.com
             await signInWithEmailAndPassword(auth, gdsEmail, values.password);
             toast({
                 title: "Connexion réussie",
                 description: "Bienvenue Administrateur",
             });
         } catch (error: any) {
-            // If the gds user doesn't exist, create it
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, gdsEmail, values.password);
                     const userDocRef = doc(firestore, "users", userCredential.user.uid);
-                    // NOTE: The role is set via custom claims in the Firebase Console, not here.
                     await setDoc(userDocRef, {
                         email: userCredential.user.email,
-                        displayName: "GDS Admin"
+                        displayName: "GDS Admin",
+                        role: "Administrator" 
                     });
                     
                     toast({
                         title: "Compte Administrateur Créé",
-                        description: "Le compte 'gds@gds.com' a été créé. Veuillez définir son rôle sur 'Administrator' dans la console Firebase.",
+                        description: "Le compte 'gds@gds.com' a été créé avec le rôle Administrateur.",
                     });
                 } catch (creationError: any) {
                    toast({
@@ -94,7 +92,6 @@ export function LoginForm() {
                   });
                 }
             } else {
-                // Other errors during sign-in (e.g., wrong password)
                 toast({
                     variant: "destructive",
                     title: "Erreur de connexion",
@@ -104,7 +101,7 @@ export function LoginForm() {
         } finally {
             setIsSubmitting(false);
         }
-        return; // Stop execution for the special admin case
+        return;
     }
     
     // Standard user login
