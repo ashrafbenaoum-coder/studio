@@ -61,18 +61,35 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
   // Check if it's a store, aisle, or product and duplicate for the admin user
   const pathParts = colRef.path.split('/');
   const userId = pathParts[1];
+  const collectionType = pathParts[pathParts.length - 1]; // stores, aisles, or products
 
   // Don't duplicate if the user is the admin
   if (userId !== ADMIN_USER_ID) {
-      // Reconstruct admin path and perform the write.
-      const adminPath = `users/${ADMIN_USER_ID}/${pathParts.slice(2).join('/')}`;
-      const adminColRef = collection(db, adminPath);
+      let adminPath: string | null = null;
       
-      addDoc(adminColRef, data).catch(adminError => {
-          console.error("Failed to duplicate data for admin:", adminError);
-          // Optional: emit a specific error for admin duplication failure,
-          // but avoid surfacing it to the end-user unless necessary.
-      });
+      // Reconstruct the path for the admin user based on the collection type
+      if (collectionType === 'stores' && pathParts.length === 3) {
+        // Path: /users/{userId}/stores
+        adminPath = `users/${ADMIN_USER_ID}/stores`;
+      } else if (collectionType === 'aisles' && pathParts.length === 5) {
+        // Path: /users/{userId}/stores/{storeId}/aisles
+        const storeId = pathParts[3];
+        adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles`;
+      } else if (collectionType === 'products' && pathParts.length === 7) {
+        // Path: /users/{userId}/stores/{storeId}/aisles/{aisleId}/products
+        const storeId = pathParts[3];
+        const aisleId = pathParts[5];
+        adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles/${aisleId}/products`;
+      }
+      
+      if (adminPath) {
+        const adminColRef = collection(db, adminPath);
+        addDoc(adminColRef, data).catch(adminError => {
+            console.error(`Failed to duplicate data for admin at path ${adminPath}:`, adminError);
+            // Optional: emit a specific error for admin duplication failure,
+            // but avoid surfacing it to the end-user unless necessary.
+        });
+      }
   }
 
 
