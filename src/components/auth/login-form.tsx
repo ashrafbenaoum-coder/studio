@@ -159,7 +159,7 @@ export function LoginForm() {
                 <FormItem>
                   <FormLabel>Identifiant</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} placeholder="Ex: gds" />
+                    <Input type="text" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
