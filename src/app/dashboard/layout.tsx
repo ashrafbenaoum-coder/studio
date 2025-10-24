@@ -165,7 +165,8 @@ export default function DashboardLayout({
           <Link href="/dashboard">
             <Logo />
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            {user && <div className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded-md">UID: {user.uid}</div>}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
