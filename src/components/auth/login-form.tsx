@@ -26,11 +26,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc, setDoc, getFirestore } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
+import { initializeFirebase } from "@/firebase";
 
 const formSchema = z.object({
-  email: z.string().email("L'adresse e-mail n'est pas valide."),
+  email: z.string().min(1, "L'identifiant est requis."),
   password: z.string().min(1, "Mot de passe est requis."),
 });
 
@@ -57,14 +58,16 @@ export function LoginForm() {
 
   const handleLogin = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
-    const inputEmail = values.email.toLowerCase();
-
+    let email = values.email;
+    if (!email.includes('@')) {
+      email = `${email}@gds.com`;
+    }
+    
     // Special handling for the 'gds' admin account bootstrap
-    if (inputEmail === "gds") {
-        const firestore = getFirestore(auth.app);
-        const gdsEmail = "gds@gds.com";
+    if (email.toLowerCase() === "gds@gds.com") {
+        const { firestore } = initializeFirebase();
         try {
-            await signInWithEmailAndPassword(auth, gdsEmail, values.password);
+            await signInWithEmailAndPassword(auth, email, values.password);
             toast({
                 title: "Connexion réussie",
                 description: "Bienvenue Administrateur",
@@ -72,7 +75,7 @@ export function LoginForm() {
         } catch (error: any) {
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
                 try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, gdsEmail, values.password);
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
                     const userDocRef = doc(firestore, "users", userCredential.user.uid);
                     await setDoc(userDocRef, {
                         email: userCredential.user.email,
@@ -106,7 +109,7 @@ export function LoginForm() {
     
     // Standard user login
     try {
-      await signInWithEmailAndPassword(auth, inputEmail, values.password);
+      await signInWithEmailAndPassword(auth, email, values.password);
       toast({
         title: "Connexion réussie",
         description: `Bienvenue`,
@@ -154,9 +157,9 @@ export function LoginForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Identifiant</FormLabel>
                   <FormControl>
-                    <Input type="text" {...field} placeholder="email@exemple.com ou gds" />
+                    <Input type="text" {...field} placeholder="Ex: gds" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
