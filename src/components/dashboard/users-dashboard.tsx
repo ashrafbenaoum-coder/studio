@@ -29,7 +29,7 @@ export function UsersDashboard() {
   // Filter out the current admin user from the list
   const otherUsers = useMemo(() => {
     if (!users || !currentUser) return [];
-    return users.filter(user => user.id !== currentUser.uid);
+    return users.filter(user => user.id !== currentUser.uid && user.email !== 'gds@gds.com');
   }, [users, currentUser]);
 
   return (

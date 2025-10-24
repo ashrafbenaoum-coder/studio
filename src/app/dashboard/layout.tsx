@@ -48,7 +48,7 @@ export default function DashboardLayout({
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
 
-  const isAdmin = useMemo(() => userProfile?.role === "Administrator", [userProfile]);
+  const isAdmin = useMemo(() => user?.email === "gds@gds.com", [user]);
   const isLoading = isUserLoading || isProfileLoading;
 
 
@@ -182,9 +182,9 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || isLoading}>
-                  {isExporting || isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  <span>{isExporting ? "Exportation..." : (isLoading ? "Vérification..." : "Exporter les fichiers")}</span>
+                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                  <span>{isExporting ? "Exportation..." : "Exporter les fichiers"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
@@ -209,12 +209,14 @@ export default function DashboardLayout({
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
-                <DropdownMenuItem asChild>
-                  <Link href={isAdmin ? "/dashboard/users" : "#"} className={!isAdmin || isLoading ? "pointer-events-none text-muted-foreground" : ""}>
-                    <Users className="mr-2 h-4 w-4" />
-                    <span>Gérer les utilisateurs</span>
-                  </Link>
-                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/users">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Gérer les utilisateurs</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem>
                     <KeyRound className="mr-2 h-4 w-4" />
                     <span>Changer le mot de passe</span>
