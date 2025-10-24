@@ -182,7 +182,7 @@ export default function DashboardLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || isLoading || !isAdmin}>
+                <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting || isLoading}>
                   {isExporting || isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                   <span>{isExporting ? "Exportation..." : (isLoading ? "Vérification..." : "Exporter les fichiers")}</span>
                 </DropdownMenuItem>
