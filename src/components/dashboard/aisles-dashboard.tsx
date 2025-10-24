@@ -188,7 +188,7 @@ export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: st
 
   const sortedAisles = useMemo(() => {
     if (!aisles) return [];
-    return [...aisles].sort((a, b) => a.name.localeCompare(b.name));
+    return [...aisles].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
   }, [aisles]);
   
   const storesLink = isViewingOtherUser ? `/dashboard/users/${userId}/stores` : '/dashboard/stores';
@@ -316,3 +316,5 @@ export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: st
     </div>
   );
 }
+
+    
