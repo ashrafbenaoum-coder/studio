@@ -1,3 +1,4 @@
+
 'use client';
     
 import {
@@ -8,13 +9,14 @@ import {
   CollectionReference,
   DocumentReference,
   SetOptions,
-  doc,
+  collection,
   getFirestore,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import {FirestorePermissionError} from '@/firebase/errors';
 
-const ADMIN_USER_ID = "XbHq5G4aWEXaW5fWx2IuIcx2wzs2"; // Hardcoded UID for gds@gds.com
+// UID for gds@gds.com
+const ADMIN_USER_ID = "92HaO0cvHPPV30OAw4efl4VBBbX2";
 
 /**
  * Initiates a setDoc operation for a document reference.
@@ -58,20 +60,19 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
     
   // Check if it's a store, aisle, or product and duplicate for the admin user
   const pathParts = colRef.path.split('/');
-  const collectionName = pathParts[pathParts.length - 1];
   const userId = pathParts[1];
 
   // Don't duplicate if the user is the admin
   if (userId !== ADMIN_USER_ID) {
-      if (collectionName === 'stores' || collectionName === 'aisles' || collectionName === 'products') {
-        const adminPath = colRef.path.replace(userId, ADMIN_USER_ID);
-        const adminColRef = new CollectionReference(db, adminPath);
-        
-        addDoc(adminColRef, data).catch(error => {
-            console.error("Failed to duplicate data for admin:", error);
-            // Optional: emit a specific error for admin duplication failure
-        });
-      }
+      // Reconstruct admin path and perform the write.
+      const adminPath = `users/${ADMIN_USER_ID}/${pathParts.slice(2).join('/')}`;
+      const adminColRef = collection(db, adminPath);
+      
+      addDoc(adminColRef, data).catch(adminError => {
+          console.error("Failed to duplicate data for admin:", adminError);
+          // Optional: emit a specific error for admin duplication failure,
+          // but avoid surfacing it to the end-user unless necessary.
+      });
   }
 
 
