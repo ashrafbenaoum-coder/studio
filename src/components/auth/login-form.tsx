@@ -2,7 +2,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
+import { setDoc, doc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,7 +27,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -63,21 +63,26 @@ export function LoginForm() {
     try {
         const result = await signInWithPopup(auth, provider);
         const userDocRef = doc(firestore, "users", result.user.uid);
-        // Use non-blocking write with proper error handling configured
-        setDocumentNonBlocking(userDocRef, {
+        
+        await setDoc(userDocRef, {
             email: result.user.email,
             displayName: result.user.displayName,
             role: "Viewer"
         }, { merge: true });
+
         toast({
             title: "Connexion réussie",
             description: `Bienvenue, ${result.user.displayName}`,
         });
-    } catch (error) {
+    } catch (error: any) {
+        let description = "Une erreur s'est produite lors de la connexion avec Google.";
+        if (error.code === 'auth/account-exists-with-different-credential') {
+            description = "Un compte existe déjà avec cet e-mail. Essayez de vous connecter avec une autre méthode.";
+        }
         toast({
             variant: "destructive",
             title: "Erreur de connexion Google",
-            description: "Une erreur s'est produite lors de la connexion avec Google.",
+            description: description,
         });
     } finally {
         setIsSubmitting(false);
@@ -97,8 +102,7 @@ export function LoginForm() {
             const userDocRef = doc(firestore, "users", userCredential.user.uid);
             const isGdsAdmin = email.toLowerCase() === "gds@gds.com";
             
-            // Use non-blocking write with proper error handling configured
-            setDocumentNonBlocking(userDocRef, {
+            await setDoc(userDocRef, {
                 email: userCredential.user.email,
                 displayName: email.split('@')[0],
                 role: isGdsAdmin ? "Administrator" : "Viewer" 
