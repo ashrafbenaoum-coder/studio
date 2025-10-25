@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,7 +28,6 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithP
 import { useToast } from "@/hooks/use-toast";
 import { doc, setDoc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
-import { initializeFirebase } from "@/firebase";
 
 const formSchema = z.object({
   email: z.string().min(1, "L'identifiant est requis."),
@@ -39,6 +38,7 @@ export function LoginForm() {
   const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -62,7 +62,6 @@ export function LoginForm() {
     const provider = new GoogleAuthProvider();
     try {
         const result = await signInWithPopup(auth, provider);
-        const { firestore } = initializeFirebase();
         const userDocRef = doc(firestore, "users", result.user.uid);
         await setDoc(userDocRef, {
             email: result.user.email,
@@ -90,8 +89,7 @@ export function LoginForm() {
     if (!email.includes('@')) {
       email = `${email}@gds.com`;
     }
-    const { firestore } = initializeFirebase();
-
+    
     if (mode === 'signup') {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
@@ -100,7 +98,7 @@ export function LoginForm() {
                 email: userCredential.user.email,
                 displayName: email.split('@')[0],
                 role: "Viewer" 
-            });
+            }, { merge: true });
             toast({
                 title: "Compte créé avec succès",
                 description: `Bienvenue, ${email.split('@')[0]}`,
@@ -135,7 +133,7 @@ export function LoginForm() {
                             email: userCredential.user.email,
                             displayName: "GDS Admin",
                             role: "Administrator" 
-                        });
+                        }, { merge: true });
                         
                         toast({
                             title: "Compte Administrateur Créé",
@@ -269,3 +267,5 @@ export function LoginForm() {
     </Card>
   );
 }
+
+    
