@@ -28,6 +28,7 @@ import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { addDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const formSchema = z.object({
   email: z.string().min(1, "L'identifiant est requis."),
@@ -64,6 +65,7 @@ export function LoginForm() {
         const result = await signInWithPopup(auth, provider);
         const userDocRef = doc(firestore, "users", result.user.uid);
         
+        // Using await with setDoc to ensure the operation completes before proceeding
         await setDoc(userDocRef, {
             email: result.user.email,
             displayName: result.user.displayName,
@@ -102,6 +104,7 @@ export function LoginForm() {
             const userDocRef = doc(firestore, "users", userCredential.user.uid);
             const isGdsAdmin = email.toLowerCase() === "gds@gds.com";
             
+            // Use await here as well for consistency and reliability
             await setDoc(userDocRef, {
                 email: userCredential.user.email,
                 displayName: email.split('@')[0],
