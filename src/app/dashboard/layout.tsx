@@ -28,6 +28,8 @@ import type { Store, Aisle, Product, UserProfile } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/actions";
 import { saveAs } from "file-saver";
+import { ChangePasswordForm } from "@/components/auth/change-password-form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 
 export default function DashboardLayout({
@@ -42,6 +44,7 @@ export default function DashboardLayout({
   const { setTheme } = useTheme();
   const { toast } = useToast();
   const [isExporting, startExportTransition] = useTransition();
+  const [isChangePasswordOpen, setChangePasswordOpen] = useState(false);
   
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -161,6 +164,14 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
+       <Dialog open={isChangePasswordOpen} onOpenChange={setChangePasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Changer le mot de passe</DialogTitle>
+          </DialogHeader>
+          <ChangePasswordForm onFinished={() => setChangePasswordOpen(false)} />
+        </DialogContent>
+      </Dialog>
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card/80 px-4 backdrop-blur md:px-6 z-10">
         <nav className="flex w-full items-center justify-between">
           <Link href="/dashboard">
@@ -231,7 +242,7 @@ export default function DashboardLayout({
                     </Link>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
                     <KeyRound className="mr-2 h-4 w-4" />
                     <span>Changer le mot de passe</span>
                 </DropdownMenuItem>
