@@ -197,7 +197,7 @@ export default function DashboardLayout({
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {user.displayName || user.email?.split('@')[0]}
+                      Bienvenue, {user.displayName || user.email?.split('@')[0]}
                     </p>
                     {user.displayName && (
                       <p className="text-xs leading-none text-muted-foreground">
@@ -260,3 +260,5 @@ export default function DashboardLayout({
     </div>
   );
 }
+
+    
