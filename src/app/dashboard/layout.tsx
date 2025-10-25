@@ -209,7 +209,7 @@ export default function DashboardLayout({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting}>
                   {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  <span>{isExporting ? "Exportation..." : "Exporter tout l'inventaire"}</span>
+                  <span>{isExporting ? "Exportation..." : "Exporter les données"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
