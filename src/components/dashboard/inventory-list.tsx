@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useMemo } from "react";
 import type { Product } from "@/lib/types";
 import { getStatus } from "@/lib/utils";
 import {
@@ -21,10 +21,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, Loader2, Trash2, Pencil } from "lucide-react";
+import { Loader2, Trash2, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { exportToExcel } from "@/lib/actions";
-import { saveAs } from 'file-saver';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,7 +60,6 @@ export function InventoryList({
   onDeleteAllProducts,
 }: InventoryListProps) {
   const { toast } = useToast();
-  const [isExporting, startExportTransition] = useTransition();
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [isDeleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
@@ -72,42 +69,6 @@ export function InventoryList({
     if (!products) return [];
     return [...products].sort((a, b) => a.address.localeCompare(b.address));
   }, [products]);
-
-  const handleExport = () => {
-    if (products.length === 0) {
-       toast({
-          variant: "destructive",
-          title: "Aucun produit à exporter",
-          description: "Ajoutez des produits à l'inventaire avant d'exporter.",
-        });
-        return;
-    }
-    startExportTransition(async () => {
-      try {
-        const base64Data = await exportToExcel(products);
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `inventaire-${new Date().toISOString().split('T')[0]}.xlsx`);
-
-        toast({
-          title: "Exportation réussie",
-          description: "Le fichier d'inventaire a été téléchargé.",
-        });
-      } catch (error) {
-        console.error("Failed to export:", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur d'exportation",
-          description: "L'exportation a échoué. Veuillez réessayer.",
-        });
-      }
-    });
-  };
 
   const confirmDelete = (productId: string) => {
     setProductToDelete(productId);
@@ -224,10 +185,6 @@ export function InventoryList({
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-              {isExporting ? "Exportation..." : "Exporter"}
-            </Button>
             <Button variant="destructive" size="sm" onClick={confirmDeleteAll} disabled={products.length === 0}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Supprimer tout
@@ -292,5 +249,3 @@ export function InventoryList({
     </>
   );
 }
-
-    
