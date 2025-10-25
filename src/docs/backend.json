@@ -91,13 +91,9 @@
     ]
   },
   "firestore": {
-    "/users": {
-        "schema": { "$ref": "#/entities/UserProfile" },
-        "description": "Collection of all user profiles, listable by admin."
-    },
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Stores user profile information, accessible only by the user themselves unless the requester is an admin."
+      "description": "Stores user profile information, accessible only by the user themselves."
     },
     "/users/{userId}/stores/{storeId}": {
       "schema": { "$ref": "#/entities/Store" },
