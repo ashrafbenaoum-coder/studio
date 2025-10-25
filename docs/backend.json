@@ -94,6 +94,10 @@
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores user profile information, accessible only by the user themselves."
     },
+    "/user_management/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "A collection of user profiles, readable by administrators for management purposes."
+    },
     "/users/{userId}/stores/{storeId}": {
       "schema": { "$ref": "#/entities/Store" },
       "description": "Stores created by a specific user."

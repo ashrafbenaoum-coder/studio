@@ -28,7 +28,7 @@ import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { addDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const formSchema = z.object({
   email: z.string().min(1, "L'identifiant est requis."),
@@ -63,12 +63,17 @@ export function LoginForm() {
     try {
       const result = await signInAnonymously(auth);
       const userDocRef = doc(firestore, "users", result.user.uid);
-      
-      await setDoc(userDocRef, {
+      const userProfileData = {
           email: `anonymous_${result.user.uid}@example.com`,
           displayName: "Anonymous User",
           role: "Viewer"
-      }, { merge: true });
+      };
+
+      await setDoc(userDocRef, userProfileData, { merge: true });
+
+      const userManagementDocRef = doc(firestore, "user_management", result.user.uid);
+      await setDoc(userManagementDocRef, userProfileData, { merge: true });
+
 
       toast({
           title: "Connexion anonyme réussie",
@@ -91,12 +96,16 @@ export function LoginForm() {
     try {
         const result = await signInWithPopup(auth, provider);
         const userDocRef = doc(firestore, "users", result.user.uid);
-        
-        await setDoc(userDocRef, {
+        const userProfileData = {
             email: result.user.email,
             displayName: result.user.displayName,
             role: "Viewer"
-        }, { merge: true });
+        };
+        
+        await setDoc(userDocRef, userProfileData, { merge: true });
+
+        const userManagementDocRef = doc(firestore, "user_management", result.user.uid);
+        await setDoc(userManagementDocRef, userProfileData, { merge: true });
 
         toast({
             title: "Connexion réussie",
@@ -130,11 +139,17 @@ export function LoginForm() {
             const userDocRef = doc(firestore, "users", userCredential.user.uid);
             const isGdsAdmin = email.toLowerCase() === "gds@gds.com";
             
-            await setDoc(userDocRef, {
+            const userProfileData = {
                 email: userCredential.user.email,
                 displayName: email.split('@')[0],
-                role: isGdsAdmin ? "Administrator" : "Viewer" 
-            }, { merge: true });
+                role: isGdsAdmin ? "Administrator" : "Viewer"
+            };
+            
+            await setDoc(userDocRef, userProfileData, { merge: true });
+
+            const userManagementDocRef = doc(firestore, "user_management", userCredential.user.uid);
+            await setDoc(userManagementDocRef, userProfileData, { merge: true });
+
 
             toast({
                 title: "Compte créé avec succès",
