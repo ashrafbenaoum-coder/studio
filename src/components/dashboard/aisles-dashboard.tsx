@@ -316,5 +316,3 @@ export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: st
     </div>
   );
 }
-
-    
