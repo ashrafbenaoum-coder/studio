@@ -185,9 +185,9 @@ export function InventoryList({
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button variant="destructive" size="sm" onClick={confirmDeleteAll} disabled={products.length === 0}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Supprimer tout
+            <Button variant="destructive" size="icon" onClick={confirmDeleteAll} disabled={products.length === 0}>
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Supprimer tout</span>
             </Button>
           </div>
         </CardHeader>
