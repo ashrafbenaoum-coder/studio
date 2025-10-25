@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useTransition } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -9,11 +9,10 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Archive, Trash2, Loader2, Package, Pencil, MoreHorizontal, Users, FileDown } from "lucide-react";
+import { Plus, Archive, Trash2, Loader2, Package, Pencil, MoreHorizontal, Users } from "lucide-react";
 import type { Aisle, Store, Product, UserProfile } from "@/lib/types";
 import {
   DropdownMenu,
@@ -44,10 +43,7 @@ import {
   deleteDocumentNonBlocking,
   setDocumentNonBlocking
 } from "@/firebase";
-import { collection, doc, getDocs } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
-import { exportToExcel } from "@/lib/actions";
-import { saveAs } from "file-saver";
+import { collection, doc } from "firebase/firestore";
 
 function AisleCard({
   userId,
@@ -131,12 +127,9 @@ function AisleCard({
 export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: string, userId?: string }) {
   const { user: currentUser } = useUser();
   const firestore = useFirestore();
-  const { toast } = useToast();
   
   const userId = targetUserId || currentUser?.uid;
   const isViewingOtherUser = targetUserId && currentUser?.uid !== targetUserId;
-
-  const [isExporting, startExportTransition] = useTransition();
 
   const targetUserDocRef = useMemoFirebase(
     () => (userId ? doc(firestore, "users", userId) : null),
@@ -188,65 +181,6 @@ export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: st
       setAisleToEdit(null);
     }
   };
-
-  const handleExportStore = () => {
-    if (!userId || !aisles) return;
-    
-    startExportTransition(async () => {
-      try {
-        if (aisles.length === 0) {
-            toast({
-                variant: "destructive",
-                title: "Aucune donnée à exporter",
-                description: "Il n'y a aucun rayon à exporter dans ce magasin.",
-            });
-            return;
-        }
-
-        let allProducts: (Product & { aisleName?: string; })[] = [];
-
-        for (const aisle of aisles) {
-          const productsQuery = collection(firestore, "users", userId, "stores", storeId, "aisles", aisle.id, "products");
-          const productsSnapshot = await getDocs(productsQuery);
-          const aisleProducts = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, aisleName: aisle.name } as Product & {aisleName: string}));
-          allProducts = [...allProducts, ...aisleProducts];
-        }
-        
-        if (allProducts.length === 0) {
-          toast({
-            variant: "destructive",
-            title: "Aucun produit à exporter",
-            description: "Aucun produit n'a été trouvé dans ce magasin.",
-          });
-          return;
-        }
-
-        const base64Data = await exportToExcel(allProducts);
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `inventaire-${store?.name}-${new Date().toISOString().split('T')[0]}.xlsx`);
-
-        toast({
-          title: "Exportation terminée",
-          description: `L'inventaire du magasin ${store?.name} a été téléchargé.`,
-        });
-
-      } catch (error) {
-        console.error("Failed to export store data:", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur d'exportation",
-          description: "L'exportation des données du magasin a échoué.",
-        });
-      }
-    });
-  };
-
 
   const isLoading = isStoreLoading || areAislesLoading;
 
@@ -334,17 +268,13 @@ export function AislesDashboard({ storeId, userId: targetUserId }: { storeId: st
       </Breadcrumb>
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
+        <CardHeader>
             <div>
                 <CardTitle>Gérer les rayons pour {store?.name ?? '...'}</CardTitle>
                 <CardDescription>
                     Ajoutez un nouveau rayon ou sélectionnez-en un pour gérer son inventaire.
                 </CardDescription>
             </div>
-             <Button variant="outline" size="sm" onClick={handleExportStore} disabled={isExporting}>
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-              {isExporting ? "Exportation..." : "Exporter le magasin"}
-            </Button>
         </CardHeader>
         <CardContent className="flex gap-2">
           <Input
