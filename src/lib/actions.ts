@@ -40,39 +40,30 @@ export async function runExpirationAnalysis(products: Product[]) {
 }
 
 export async function exportToExcel(products: (Product & { storeName?: string; aisleName?: string })[]) {
+    const header: string[] = [];
+    const hasStore = products.some(p => p.storeName);
+    const hasAisle = products.some(p => p.aisleName);
+
+    if (hasStore) header.push("Nom du Magasin");
+    if (hasAisle) header.push("Nom du Rayon");
+    header.push("Adresse", "Produit (Code Barre)", "Quantité", "Date d'expiration", "Statut");
+
     const dataToExport = products.map((product) => {
       const status = getStatus(product.expirationDate);
-      const record: any = {
-        Adresse: product.address,
-        "Produit (Code Barre)": product.barcode,
-        Quantité: product.quantity,
-        "Date d'expiration": product.expirationDate,
-        Statut: status.label,
-      };
-      if (product.storeName) {
-        record["Nom du Magasin"] = product.storeName;
-      }
-      if (product.aisleName) {
-        record["Nom du Rayon"] = product.aisleName;
-      }
+      const record: any = {};
+      if (hasStore) record["Nom du Magasin"] = product.storeName || "-";
+      if (hasAisle) record["Nom du Rayon"] = product.aisleName || "-";
+      
+      record["Adresse"] = product.address;
+      record["Produit (Code Barre)"] = product.barcode;
+      record["Quantité"] = product.quantity;
+      record["Date d'expiration"] = product.expirationDate;
+      record["Statut"] = status.label;
+      
       return record;
     });
 
-    const orderedData = dataToExport.map(item => {
-        const orderedItem: any = {};
-        if (item["Nom du Magasin"]) orderedItem["Nom du Magasin"] = item["Nom du Magasin"];
-        if (item["Nom du Rayon"]) orderedItem["Nom du Rayon"] = item["Nom du Rayon"];
-        
-        orderedItem["Adresse"] = item["Adresse"];
-        orderedItem["Produit (Code Barre)"] = item["Produit (Code Barre)"];
-        orderedItem["Quantité"] = item["Quantité"];
-        orderedItem["Date d'expiration"] = item["Date d'expiration"];
-        orderedItem["Statut"] = item["Statut"];
-
-        return orderedItem;
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(orderedData);
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport, { header });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Inventaire");
     

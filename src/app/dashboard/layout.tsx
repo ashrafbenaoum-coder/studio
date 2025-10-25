@@ -94,7 +94,7 @@ export default function DashboardLayout({
           for (const aisle of aisles) {
             const productsQuery = collection(firestore, "users", user.uid, "stores", store.id, "aisles", aisle.id, "products");
             const productsSnapshot = await getDocs(productsQuery);
-            const aisleProducts = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, storeName: store.name, aisleName: aisle.name }));
+            const aisleProducts = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, storeName: store.name, aisleName: aisle.name } as Product & { storeName: string; aisleName: string; }));
             allProducts = [...allProducts, ...aisleProducts];
           }
         }
@@ -209,7 +209,7 @@ export default function DashboardLayout({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleExportAllStores} disabled={isExporting}>
                   {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  <span>{isExporting ? "Exportation..." : "Exporter les fichiers"}</span>
+                  <span>{isExporting ? "Exportation..." : "Exporter tout l'inventaire"}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
