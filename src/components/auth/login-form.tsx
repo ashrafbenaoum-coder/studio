@@ -25,7 +25,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { addDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
@@ -57,6 +57,33 @@ export function LoginForm() {
       router.push("/dashboard");
     }
   }, [user, isUserLoading, router]);
+
+  const handleAnonymousSignIn = async () => {
+    setIsSubmitting(true);
+    try {
+      const result = await signInAnonymously(auth);
+      const userDocRef = doc(firestore, "users", result.user.uid);
+      
+      await setDoc(userDocRef, {
+          email: `anonymous_${result.user.uid}@example.com`,
+          displayName: "Anonymous User",
+          role: "Viewer"
+      }, { merge: true });
+
+      toast({
+          title: "Connexion anonyme réussie",
+          description: "Vous êtes maintenant connecté en tant qu'utilisateur anonyme.",
+      });
+    } catch (error) {
+      toast({
+          variant: "destructive",
+          title: "Erreur de connexion anonyme",
+          description: "Une erreur s'est produite lors de la tentative de connexion anonyme.",
+      });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
   
   const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
@@ -65,7 +92,6 @@ export function LoginForm() {
         const result = await signInWithPopup(auth, provider);
         const userDocRef = doc(firestore, "users", result.user.uid);
         
-        // Using await with setDoc to ensure the operation completes before proceeding
         await setDoc(userDocRef, {
             email: result.user.email,
             displayName: result.user.displayName,
@@ -104,7 +130,6 @@ export function LoginForm() {
             const userDocRef = doc(firestore, "users", userCredential.user.uid);
             const isGdsAdmin = email.toLowerCase() === "gds@gds.com";
             
-            // Use await here as well for consistency and reliability
             await setDoc(userDocRef, {
                 email: userCredential.user.email,
                 displayName: email.split('@')[0],
@@ -217,10 +242,15 @@ export function LoginForm() {
           </div>
         </div>
 
-        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
-           <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4"><path fill="currentColor" d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.36 1.95-4.25 1.95-3.52 0-6.43-2.88-6.43-6.43s2.91-6.43 6.43-6.43c1.93 0 3.26.74 4.18 1.62l2.35-2.35C17.07 3.32 15.04 2.5 12.48 2.5c-5.48 0-9.88 4.4-9.88 9.88s4.4 9.88 9.88 9.88c2.92 0 5.1-1 6.8-2.65 1.83-1.73 2.4-4.25 2.4-6.55 0-.57-.05-.98-.13-1.38z"></path></svg>
-          Google
-        </Button>
+        <div className="grid grid-cols-1 gap-2">
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
+               <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4"><path fill="currentColor" d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.36 1.95-4.25 1.95-3.52 0-6.43-2.88-6.43-6.43s2.91-6.43 6.43-6.43c1.93 0 3.26.74 4.18 1.62l2.35-2.35C17.07 3.32 15.04 2.5 12.48 2.5c-5.48 0-9.88 4.4-9.88 9.88s4.4 9.88 9.88 9.88c2.92 0 5.1-1 6.8-2.65 1.83-1.73 2.4-4.25 2.4-6.55 0-.57-.05-.98-.13-1.38z"></path></svg>
+              Google
+            </Button>
+             <Button variant="secondary" className="w-full" onClick={handleAnonymousSignIn} disabled={isSubmitting}>
+              Dخول كمجهول
+            </Button>
+        </div>
         
         <p className="mt-4 px-8 text-center text-sm text-muted-foreground">
           <button
