@@ -10,6 +10,7 @@ import {
   DocumentReference,
   SetOptions,
   collection,
+  doc,
   getFirestore,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -52,9 +53,15 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
     .then(docRef => {
         // Only duplicate if the original write was successful and the user is not the admin
         const pathParts = colRef.path.split('/');
-        const userId = pathParts[1];
-        if (userId !== ADMIN_USER_ID) {
-            duplicateDataForAdmin(db, pathParts, docRef.id, data);
+        if (pathParts.length > 1) {
+            const userId = pathParts[1];
+            if (userId !== ADMIN_USER_ID) {
+                // Construct the admin path by replacing the userId with the admin's UID
+                const adminPath = [ "users", ADMIN_USER_ID, ...pathParts.slice(2)].join('/');
+                const adminDocRef = doc(db, adminPath, docRef.id);
+                // Use setDoc with the new docRef.id to ensure the ID is the same
+                setDocumentNonBlocking(adminDocRef, data);
+            }
         }
     })
     .catch(error => {
@@ -68,35 +75,6 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
         })
       )
     });
-}
-
-function duplicateDataForAdmin(db: any, originalPathParts: string[], newDocId: string, data: any) {
-    let adminPath: string | null = null;
-    const collectionType = originalPathParts[originalPathParts.length - 1];
-
-    try {
-        if (collectionType === 'stores' && originalPathParts.length === 3) {
-            // Path: /users/{userId}/stores -> users/{adminId}/stores
-            adminPath = `users/${ADMIN_USER_ID}/stores`;
-            const adminColRef = collection(db, adminPath);
-            setDocumentNonBlocking(doc(adminColRef, newDocId), data); // Use set with newDocId to maintain ID
-        } else if (collectionType === 'aisles' && originalPathParts.length === 5) {
-            // Path: /users/{userId}/stores/{storeId}/aisles -> users/{adminId}/stores/{storeId}/aisles
-            const storeId = originalPathParts[3];
-            adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles`;
-            const adminColRef = collection(db, adminPath);
-            setDocumentNonBlocking(doc(adminColRef, newDocId), data); // Use set with newDocId
-        } else if (collectionType === 'products' && originalPathParts.length === 7) {
-            // Path: /users/{userId}/stores/{storeId}/aisles/{aisleId}/products -> ...
-            const storeId = originalPathParts[3];
-            const aisleId = originalPathParts[5];
-            adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles/${aisleId}/products`;
-            const adminColRef = collection(db, adminPath);
-            setDocumentNonBlocking(doc(adminColRef, newDocId), data); // Use set with newDocId
-        }
-    } catch (adminError) {
-        console.error(`Failed to construct admin path or write for path ${adminPath}:`, adminError);
-    }
 }
 
 
