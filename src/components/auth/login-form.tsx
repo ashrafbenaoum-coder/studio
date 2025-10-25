@@ -24,7 +24,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { doc, setDoc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
@@ -41,6 +41,7 @@ export function LoginForm() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mode, setMode] = useState<"login" | "signup">("login");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,79 +56,133 @@ export function LoginForm() {
       router.push("/dashboard");
     }
   }, [user, isUserLoading, router]);
+  
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
+    const provider = new GoogleAuthProvider();
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const { firestore } = initializeFirebase();
+        const userDocRef = doc(firestore, "users", result.user.uid);
+        await setDoc(userDocRef, {
+            email: result.user.email,
+            displayName: result.user.displayName,
+            role: "Viewer"
+        }, { merge: true });
+        toast({
+            title: "Connexion réussie",
+            description: `Bienvenue, ${result.user.displayName}`,
+        });
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Erreur de connexion Google",
+            description: "Une erreur s'est produite lors de la connexion avec Google.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
 
-  const handleLogin = async (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     let email = values.email;
     if (!email.includes('@')) {
       email = `${email}@gds.com`;
     }
-    
-    // Special handling for the 'gds' admin account bootstrap
-    if (email.toLowerCase() === "gds@gds.com") {
-        const { firestore } = initializeFirebase();
+    const { firestore } = initializeFirebase();
+
+    if (mode === 'signup') {
         try {
-            await signInWithEmailAndPassword(auth, email, values.password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
+            const userDocRef = doc(firestore, "users", userCredential.user.uid);
+            await setDoc(userDocRef, {
+                email: userCredential.user.email,
+                displayName: email.split('@')[0],
+                role: "Viewer" 
+            });
             toast({
-                title: "Connexion réussie",
-                description: "Bienvenue Administrateur",
+                title: "Compte créé avec succès",
+                description: `Bienvenue, ${email.split('@')[0]}`,
             });
         } catch (error: any) {
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
-                    const userDocRef = doc(firestore, "users", userCredential.user.uid);
-                    await setDoc(userDocRef, {
-                        email: userCredential.user.email,
-                        displayName: "GDS Admin",
-                        role: "Administrator" 
-                    });
-                    
-                    toast({
-                        title: "Compte Administrateur Créé",
-                        description: "Le compte 'gds@gds.com' a été créé avec le rôle Administrateur.",
-                    });
-                } catch (creationError: any) {
-                   toast({
-                    variant: "destructive",
-                    title: "Erreur de création",
-                    description: "Impossible de créer le compte administrateur.",
-                  });
-                }
-            } else {
-                toast({
-                    variant: "destructive",
-                    title: "Erreur de connexion",
-                    description: "Login ou mot de passe incorrect pour l'admin.",
-                });
-            }
+            const message = error.code === 'auth/email-already-in-use' 
+                ? "Cet email est déjà utilisé." 
+                : "Impossible de créer le compte.";
+            toast({
+                variant: "destructive",
+                title: "Erreur de création de compte",
+                description: message,
+            });
         } finally {
             setIsSubmitting(false);
         }
-        return;
-    }
+    } else { // Login mode
+        // Special handling for the 'gds' admin account bootstrap
+        if (email.toLowerCase() === "gds@gds.com") {
+            try {
+                await signInWithEmailAndPassword(auth, email, values.password);
+                toast({
+                    title: "Connexion réussie",
+                    description: "Bienvenue Administrateur",
+                });
+            } catch (error: any) {
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                    try {
+                        const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
+                        const userDocRef = doc(firestore, "users", userCredential.user.uid);
+                        await setDoc(userDocRef, {
+                            email: userCredential.user.email,
+                            displayName: "GDS Admin",
+                            role: "Administrator" 
+                        });
+                        
+                        toast({
+                            title: "Compte Administrateur Créé",
+                            description: "Le compte 'gds@gds.com' a été créé avec le rôle Administrateur.",
+                        });
+                    } catch (creationError: any) {
+                       toast({
+                        variant: "destructive",
+                        title: "Erreur de création",
+                        description: "Impossible de créer le compte administrateur.",
+                      });
+                    }
+                } else {
+                    toast({
+                        variant: "destructive",
+                        title: "Erreur de connexion",
+                        description: "Login ou mot de passe incorrect pour l'admin.",
+                    });
+                }
+            } finally {
+                setIsSubmitting(false);
+            }
+            return;
+        }
+        
+        // Standard user login
+        try {
+          await signInWithEmailAndPassword(auth, email, values.password);
+          toast({
+            title: "Connexion réussie",
+            description: `Bienvenue`,
+          });
     
-    // Standard user login
-    try {
-      await signInWithEmailAndPassword(auth, email, values.password);
-      toast({
-        title: "Connexion réussie",
-        description: `Bienvenue`,
-      });
-
-    } catch (error: any) {
-      const message =
-        error.code === "auth/wrong-password" || error.code === "auth/user-not-found" || error.code === "auth/invalid-credential"
-          ? "Email ou mot de passe incorrect."
-          : "Une erreur de connexion s'est produite.";
-      
-      toast({
-        variant: "destructive",
-        title: "Erreur de connexion",
-        description: message,
-      });
-    } finally {
-      setIsSubmitting(false);
+        } catch (error: any) {
+          const message =
+            error.code === "auth/wrong-password" || error.code === "auth/user-not-found" || error.code === "auth/invalid-credential"
+              ? "Email ou mot de passe incorrect."
+              : "Une erreur de connexion s'est produite.";
+          
+          toast({
+            variant: "destructive",
+            title: "Erreur de connexion",
+            description: message,
+          });
+        } finally {
+          setIsSubmitting(false);
+        }
     }
   };
 
@@ -143,15 +198,15 @@ export function LoginForm() {
     <Card className="w-full max-w-sm mx-auto">
       <CardHeader>
         <CardTitle className="text-center text-2xl font-headline">
-          Se connecter
+          {mode === 'login' ? 'Se connecter' : 'Créer un compte'}
         </CardTitle>
         <CardDescription className="text-center">
-          Accédez à votre tableau de bord de gestion des stocks.
+          {mode === 'login' ? 'Accédez à votre tableau de bord de gestion des stocks.' : 'Remplissez les informations pour créer un compte.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="email"
@@ -180,10 +235,36 @@ export function LoginForm() {
             />
             <Button type="submit" className="w-full !mt-6" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? "Connexion..." : "Se connecter"}
+              {isSubmitting ? "En cours..." : (mode === 'login' ? 'Se connecter' : 'Créer le compte')}
             </Button>
           </form>
         </Form>
+        
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Ou continuer avec
+            </span>
+          </div>
+        </div>
+
+        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
+           <svg role="img" viewBox="0 0 24 24" className="mr-2 h-4 w-4"><path fill="currentColor" d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.36 1.95-4.25 1.95-3.52 0-6.43-2.88-6.43-6.43s2.91-6.43 6.43-6.43c1.93 0 3.26.74 4.18 1.62l2.35-2.35C17.07 3.32 15.04 2.5 12.48 2.5c-5.48 0-9.88 4.4-9.88 9.88s4.4 9.88 9.88 9.88c2.92 0 5.1-1 6.8-2.65 1.83-1.73 2.4-4.25 2.4-6.55 0-.57-.05-.98-.13-1.38z"></path></svg>
+          Google
+        </Button>
+        
+        <p className="mt-4 px-8 text-center text-sm text-muted-foreground">
+          <button
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            className="underline underline-offset-4 hover:text-primary"
+            >
+            {mode === 'login' ? "Vous n'avez pas de compte? Créer un compte" : "Vous avez déjà un compte? Se connecter"}
+          </button>
+        </p>
+
       </CardContent>
     </Card>
   );
