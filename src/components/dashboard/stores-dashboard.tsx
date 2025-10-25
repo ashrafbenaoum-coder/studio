@@ -116,7 +116,7 @@ export function StoresDashboard({ userId: targetUserId }: { userId?: string }) {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                    <BreadcrumbPage>{targetUser?.displayName || targetUser?.email || '...'}</BreadcrumbPage>
+                    <BreadcrumbPage>{`Magasins de ${targetUser?.displayName || targetUser?.email || '...'}`}</BreadcrumbPage>
                 </BreadcrumbItem>
             </BreadcrumbList>
         </Breadcrumb>
