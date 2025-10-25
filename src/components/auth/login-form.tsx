@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAuth, useUser, useFirestore } from "@/firebase";
+import { useAuth, useUser, useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,7 +26,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-import { doc, setDoc } from "firebase/firestore";
+import { doc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -63,7 +63,8 @@ export function LoginForm() {
     try {
         const result = await signInWithPopup(auth, provider);
         const userDocRef = doc(firestore, "users", result.user.uid);
-        await setDoc(userDocRef, {
+        // Use non-blocking write with proper error handling configured
+        setDocumentNonBlocking(userDocRef, {
             email: result.user.email,
             displayName: result.user.displayName,
             role: "Viewer"
@@ -94,11 +95,15 @@ export function LoginForm() {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
             const userDocRef = doc(firestore, "users", userCredential.user.uid);
-            await setDoc(userDocRef, {
+            const isGdsAdmin = email.toLowerCase() === "gds@gds.com";
+            
+            // Use non-blocking write with proper error handling configured
+            setDocumentNonBlocking(userDocRef, {
                 email: userCredential.user.email,
                 displayName: email.split('@')[0],
-                role: "Viewer" 
+                role: isGdsAdmin ? "Administrator" : "Viewer" 
             }, { merge: true });
+
             toast({
                 title: "Compte créé avec succès",
                 description: `Bienvenue, ${email.split('@')[0]}`,
@@ -116,50 +121,6 @@ export function LoginForm() {
             setIsSubmitting(false);
         }
     } else { // Login mode
-        // Special handling for the 'gds' admin account bootstrap
-        if (email.toLowerCase() === "gds@gds.com") {
-            try {
-                await signInWithEmailAndPassword(auth, email, values.password);
-                toast({
-                    title: "Connexion réussie",
-                    description: "Bienvenue Administrateur",
-                });
-            } catch (error: any) {
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                    try {
-                        const userCredential = await createUserWithEmailAndPassword(auth, email, values.password);
-                        const userDocRef = doc(firestore, "users", userCredential.user.uid);
-                        await setDoc(userDocRef, {
-                            email: userCredential.user.email,
-                            displayName: "GDS Admin",
-                            role: "Administrator" 
-                        }, { merge: true });
-                        
-                        toast({
-                            title: "Compte Administrateur Créé",
-                            description: "Le compte 'gds@gds.com' a été créé avec le rôle Administrateur.",
-                        });
-                    } catch (creationError: any) {
-                       toast({
-                        variant: "destructive",
-                        title: "Erreur de création",
-                        description: "Impossible de créer le compte administrateur.",
-                      });
-                    }
-                } else {
-                    toast({
-                        variant: "destructive",
-                        title: "Erreur de connexion",
-                        description: "Login ou mot de passe incorrect pour l'admin.",
-                    });
-                }
-            } finally {
-                setIsSubmitting(false);
-            }
-            return;
-        }
-        
-        // Standard user login
         try {
           await signInWithEmailAndPassword(auth, email, values.password);
           toast({
@@ -267,5 +228,3 @@ export function LoginForm() {
     </Card>
   );
 }
-
-    

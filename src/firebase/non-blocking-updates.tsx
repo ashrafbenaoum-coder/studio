@@ -15,24 +15,26 @@ import {
 import { errorEmitter } from '@/firebase/error-emitter';
 import {FirestorePermissionError} from '@/firebase/errors';
 
-// UID for gds@gds.com
+// UID for gds@gds.com - This should be kept secure and potentially moved to environment variables in a real app
 const ADMIN_USER_ID = "92HaO0cvHPPV30OAw4efl4VBBbX2";
 
 /**
  * Initiates a setDoc operation for a document reference.
  * Does NOT await the write operation internally.
  */
-export function setDocumentNonBlocking(docRef: DocumentReference, data: any, options: SetOptions) {
-  setDoc(docRef, data, options).catch(error => {
+export function setDocumentNonBlocking(docRef: DocumentReference, data: any, options?: SetOptions) {
+  const promise = options ? setDoc(docRef, data, options) : setDoc(docRef, data);
+  promise.catch(error => {
+    console.error(`Error in setDocumentNonBlocking for path ${docRef.path}:`, error);
     errorEmitter.emit(
       'permission-error',
       new FirestorePermissionError({
         path: docRef.path,
-        operation: 'write', // or 'create'/'update' based on options
+        operation: 'write', // Simplified operation for setDoc
         requestResourceData: data,
       })
     )
-  })
+  });
   // Execution continues immediately
 }
 
@@ -46,8 +48,17 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
   const db = getFirestore(colRef.firestore.app);
   
   // First, add the document for the original user
-  const originalPromise = addDoc(colRef, data)
+  addDoc(colRef, data)
+    .then(docRef => {
+        // Only duplicate if the original write was successful and the user is not the admin
+        const pathParts = colRef.path.split('/');
+        const userId = pathParts[1];
+        if (userId !== ADMIN_USER_ID) {
+            duplicateDataForAdmin(db, pathParts, docRef.id, data);
+        }
+    })
     .catch(error => {
+      console.error(`Error in addDocumentNonBlocking for path ${colRef.path}:`, error);
       errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
@@ -57,43 +68,35 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
         })
       )
     });
-    
-  // Check if it's a store, aisle, or product and duplicate for the admin user
-  const pathParts = colRef.path.split('/');
-  const userId = pathParts[1];
-  const collectionType = pathParts[pathParts.length - 1]; // stores, aisles, or products
+}
 
-  // Don't duplicate if the user is the admin
-  if (userId !== ADMIN_USER_ID) {
-      let adminPath: string | null = null;
-      
-      // Reconstruct the path for the admin user based on the collection type
-      if (collectionType === 'stores' && pathParts.length === 3) {
-        // Path: /users/{userId}/stores
-        adminPath = `users/${ADMIN_USER_ID}/stores`;
-      } else if (collectionType === 'aisles' && pathParts.length === 5) {
-        // Path: /users/{userId}/stores/{storeId}/aisles
-        const storeId = pathParts[3];
-        adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles`;
-      } else if (collectionType === 'products' && pathParts.length === 7) {
-        // Path: /users/{userId}/stores/{storeId}/aisles/{aisleId}/products
-        const storeId = pathParts[3];
-        const aisleId = pathParts[5];
-        adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles/${aisleId}/products`;
-      }
-      
-      if (adminPath) {
-        const adminColRef = collection(db, adminPath);
-        addDoc(adminColRef, data).catch(adminError => {
-            console.error(`Failed to duplicate data for admin at path ${adminPath}:`, adminError);
-            // Optional: emit a specific error for admin duplication failure,
-            // but avoid surfacing it to the end-user unless necessary.
-        });
-      }
-  }
+function duplicateDataForAdmin(db: any, originalPathParts: string[], newDocId: string, data: any) {
+    let adminPath: string | null = null;
+    const collectionType = originalPathParts[originalPathParts.length - 1];
 
-
-  return originalPromise;
+    try {
+        if (collectionType === 'stores' && originalPathParts.length === 3) {
+            // Path: /users/{userId}/stores -> users/{adminId}/stores
+            adminPath = `users/${ADMIN_USER_ID}/stores`;
+            const adminColRef = collection(db, adminPath);
+            setDocumentNonBlocking(doc(adminColRef, newDocId), data); // Use set with newDocId to maintain ID
+        } else if (collectionType === 'aisles' && originalPathParts.length === 5) {
+            // Path: /users/{userId}/stores/{storeId}/aisles -> users/{adminId}/stores/{storeId}/aisles
+            const storeId = originalPathParts[3];
+            adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles`;
+            const adminColRef = collection(db, adminPath);
+            setDocumentNonBlocking(doc(adminColRef, newDocId), data); // Use set with newDocId
+        } else if (collectionType === 'products' && originalPathParts.length === 7) {
+            // Path: /users/{userId}/stores/{storeId}/aisles/{aisleId}/products -> ...
+            const storeId = originalPathParts[3];
+            const aisleId = originalPathParts[5];
+            adminPath = `users/${ADMIN_USER_ID}/stores/${storeId}/aisles/${aisleId}/products`;
+            const adminColRef = collection(db, adminPath);
+            setDocumentNonBlocking(doc(adminColRef, newDocId), data); // Use set with newDocId
+        }
+    } catch (adminError) {
+        console.error(`Failed to construct admin path or write for path ${adminPath}:`, adminError);
+    }
 }
 
 
@@ -104,6 +107,7 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
 export function updateDocumentNonBlocking(docRef: DocumentReference, data: any) {
   updateDoc(docRef, data)
     .catch(error => {
+       console.error(`Error in updateDocumentNonBlocking for path ${docRef.path}:`, error);
       errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
@@ -123,6 +127,7 @@ export function updateDocumentNonBlocking(docRef: DocumentReference, data: any) 
 export function deleteDocumentNonBlocking(docRef: DocumentReference) {
   deleteDoc(docRef)
     .catch(error => {
+      console.error(`Error in deleteDocumentNonBlocking for path ${docRef.path}:`, error);
       errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
