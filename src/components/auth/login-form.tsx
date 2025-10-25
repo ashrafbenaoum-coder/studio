@@ -248,7 +248,7 @@ export function LoginForm() {
               Google
             </Button>
              <Button variant="secondary" className="w-full" onClick={handleAnonymousSignIn} disabled={isSubmitting}>
-              Dخول كمجهول
+              Connexion anonyme
             </Button>
         </div>
         
