@@ -28,7 +28,6 @@ import * as z from "zod";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 
 const formSchema = z.object({
   email: z.string().min(1, "L'identifiant est requis."),
@@ -68,12 +67,7 @@ export function LoginForm() {
           displayName: "Anonymous User",
           role: "Viewer"
       };
-
       await setDoc(userDocRef, userProfileData, { merge: true });
-
-      const userManagementDocRef = doc(firestore, "user_management", result.user.uid);
-      await setDoc(userManagementDocRef, userProfileData, { merge: true });
-
 
       toast({
           title: "Connexion anonyme réussie",
@@ -101,12 +95,8 @@ export function LoginForm() {
             displayName: result.user.displayName,
             role: "Viewer"
         };
-        
         await setDoc(userDocRef, userProfileData, { merge: true });
-
-        const userManagementDocRef = doc(firestore, "user_management", result.user.uid);
-        await setDoc(userManagementDocRef, userProfileData, { merge: true });
-
+        
         toast({
             title: "Connexion réussie",
             description: `Bienvenue, ${result.user.displayName}`,
@@ -146,10 +136,6 @@ export function LoginForm() {
             };
             
             await setDoc(userDocRef, userProfileData, { merge: true });
-
-            const userManagementDocRef = doc(firestore, "user_management", userCredential.user.uid);
-            await setDoc(userManagementDocRef, userProfileData, { merge: true });
-
 
             toast({
                 title: "Compte créé avec succès",
